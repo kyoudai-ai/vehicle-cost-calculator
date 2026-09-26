@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KYOUDAI 車両交通費計算</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   "Noto Sans JP", sans-serif;
+      background: #f5f6f8;
+      color: #222;
+    }
+
+    .container {
+      width: min(92%, 480px);
+      margin: 0 auto;
+      padding: 28px 0 50px;
+    }
+
+    .brand {
+      text-align: center;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      text-align: center;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      margin: 0 0 25px;
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .card {
+      background: white;
+      padding: 22px;
+      border-radius: 18px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.08);
+    }
+
+    label {
+      display: block;
+      margin: 17px 0 7px;
+      font-weight: 700;
+    }
+
+    label:first-child {
+      margin-top: 0;
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+
+    input {
+      width: 100%;
+      padding: 15px 65px 15px 14px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      font-size: 18px;
+      background: white;
+    }
+
+    input:focus {
+      outline: 2px solid #222;
+      border-color: #222;
+    }
+
+    .unit {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #666;
+      font-size: 14px;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 24px;
+      padding: 16px;
+      border: 0;
+      border-radius: 12px;
+      background: #111;
+      color: white;
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .result {
+      display: none;
+      margin-top: 20px;
+      padding: 20px;
+      background: #f1f3f5;
+      border-radius: 14px;
+      text-align: center;
+    }
+
+    .result-title {
+      font-size: 14px;
+      color: #666;
+    }
+
+    .price {
+      margin-top: 5px;
+      font-size: 36px;
+      font-weight: 900;
+    }
+
+    .detail {
+      margin-top: 12px;
+      color: #555;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .error {
+      display: none;
+      margin-top: 15px;
+      color: #c00;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    footer {
+      margin-top: 22px;
+      text-align: center;
+      color: #888;
+      font-size: 12px;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+
+    <div class="brand">KYOUDAI</div>
+
+    <h1>車両交通費計算</h1>
+
+    <p class="subtitle">
+      距離・燃費・ガソリン価格を入力するだけ。<br>
+      燃料代をすぐ計算できます。
+    </p>
+
+    <div class="card">
+
+      <label for="distance">走行距離</label>
+      <div class="input-wrap">
+        <input id="distance" type="number" inputmode="decimal"
+               min="0" step="0.1" placeholder="例：50">
+        <span class="unit">km</span>
+      </div>
+
+      <label for="fuelEfficiency">車の燃費</label>
+      <div class="input-wrap">
+        <input id="fuelEfficiency" type="number" inputmode="decimal"
+               min="0" step="0.1" placeholder="例：10">
+        <span class="unit">km/L</span>
+      </div>
+
+      <label for="gasPrice">ガソリン価格</label>
+      <div class="input-wrap">
+        <input id="gasPrice" type="number" inputmode="decimal"
+               min="0" step="0.1" placeholder="例：170">
+        <span class="unit">円/L</span>
+      </div>
+
+      <button type="button" onclick="calculateCost()">
+        計算する
+      </button>
+
+      <div id="error" class="error">
+        3項目すべてに0より大きい数字を入力してください。
+      </div>
+
+      <div id="result" class="result">
+        <div class="result-title">燃料代</div>
+        <div id="fuelCost" class="price">0円</div>
+
+        <div id="detail" class="detail"></div>
+      </div>
+
+    </div>
+
+    <footer>
+      © KYOUDAI
+    </footer>
+
+  </main>
+
+  <script>
+    function calculateCost() {
+      const distance =
+        Number(document.getElementById("distance").value);
+
+      const fuelEfficiency =
+        Number(document.getElementById("fuelEfficiency").value);
+
+      const gasPrice =
+        Number(document.getElementById("gasPrice").value);
+
+      const result =
+        document.getElementById("result");
+
+      const error =
+        document.getElementById("error");
+
+      if (
+        distance <= 0 ||
+        fuelEfficiency <= 0 ||
+        gasPrice <= 0
+      ) {
+        result.style.display = "none";
+        error.style.display = "block";
+        return;
+      }
+
+      const liters = distance / fuelEfficiency;
+      const fuelCost = liters * gasPrice;
+      const costPerKm = gasPrice / fuelEfficiency;
+
+      document.getElementById("fuelCost").textContent =
+        Math.round(fuelCost).toLocaleString("ja-JP") + "円";
+
+      document.getElementById("detail").innerHTML =
+        "使用燃料：約 " +
+        liters.toFixed(2) +
+        " L<br>" +
+        "燃料費：約 " +
+        costPerKm.toFixed(1) +
+        " 円 / km";
+
+      error.style.display = "none";
+      result.style.display = "block";
+    }
+  </script>
+
+</body>
+</html>
