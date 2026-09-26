@@ -10,7 +10,9 @@
 
     body {
       margin: 0;
+    
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+        
                    "Noto Sans JP", sans-serif;
       background: #f5f6f8;
       color: #222;
@@ -137,7 +139,10 @@
       font-weight: 900;
       cursor: pointer;
     }
-
+#businessEstimateButton {
+  display: none;
+  margin-top: 14px;
+}
     .result {
       display: none;
       margin-top: 20px;
@@ -306,8 +311,11 @@
         <div id="totalCost" class="price">0円</div>
       </div>
 
-      <div id="detail" class="detail"></div>
+     <div id="detail" class="detail"></div>
 
+<button type="button" id="businessEstimateButton">
+  業者向け見積計算へ
+</button> 
     </div>
 
     
@@ -425,7 +433,8 @@
 
     error.style.display = "none";
     result.style.display = "block";
-  }
+document.getElementById("businessEstimateButton").style.display = "block";
+ }   
 </script>
 
 </body>
