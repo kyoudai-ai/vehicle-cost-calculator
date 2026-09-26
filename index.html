@@ -286,27 +286,8 @@
          placeholder="例：1200">
   <span class="unit">円</span>
 </div>
-<label for="parkingFee">駐車料金</label>
-<div class="input-wrap">
-  <input id="parkingFee"
-         type="number"
-         inputmode="numeric"
-         min="0"
-         step="1"
-         placeholder="例：500">
-  <span class="unit">円</span>
-</div>
-<label for="otherFee">その他交通費</label>
-<div class="input-wrap">
-  <input id="otherFee"
-         type="number"
-         inputmode="numeric"
-         min="0"
-         step="1"
-         placeholder="例：300">
-  <span class="unit">円</span>
-</div>
-    
+
+
     
     
 
@@ -321,7 +302,7 @@
     <div id="result" class="result">
 
       <div class="result-main">
-        <div class="result-title">今回の燃料交通費</div>
+       <div class="result-title">今回の移動費目安</div> 
         <div id="totalCost" class="price">0円</div>
       </div>
 
@@ -329,6 +310,7 @@
 
     </div>
 
+    
   </div>
 
   <footer>
@@ -385,16 +367,14 @@
 　　const etcFee =
   Number(document.getElementById("etcFee").value) || 0;
 
-const parkingFee =
-  Number(document.getElementById("parkingFee").value) || 0;
 
-const otherFee =
-  Number(document.getElementById("otherFee").value) || 0;
     const error =
       document.getElementById("error");
 
     const result =
       document.getElementById("result");
+
+    
 
     if (
       oneWayDistance <= 0 ||
@@ -417,7 +397,7 @@ const otherFee =
     const fuelCost =
       liters * fuelPrice;
 　　const totalCost =
-    fuelCost + etcFee + parkingFee + otherFee;
+  fuelCost + etcFee;
     const costPerKm =
       fuelPrice / fuelEfficiency;
 
@@ -440,9 +420,8 @@ const otherFee =
       fuelPrice.toLocaleString("ja-JP") + " 円/L<br>" +
       "1kmあたり燃料費：約 " +
       costPerKm.toFixed(1) + " 円/km<br>" +
-"ETC・高速道路料金：" + etcFee.toLocaleString("ja-JP") + " 円<br>" +
-"駐車料金：" + parkingFee.toLocaleString("ja-JP") + " 円<br>" +
-"その他交通費：" + otherFee.toLocaleString("ja-JP") + " 円";
+"ETC・高速道路料金：" + etcFee.toLocaleString("ja-JP") + " 円";
+
 
     error.style.display = "none";
     result.style.display = "block";
