@@ -276,6 +276,39 @@
              placeholder="例：10">
       <span class="unit">km/L</span>
     </div>
+　　<label for="etcFee">ETC・高速道路料金</label>
+<div class="input-wrap">
+  <input id="etcFee"
+         type="number"
+         inputmode="numeric"
+         min="0"
+         step="1"
+         placeholder="例：1200">
+  <span class="unit">円</span>
+</div>
+<label for="parkingFee">駐車料金</label>
+<div class="input-wrap">
+  <input id="parkingFee"
+         type="number"
+         inputmode="numeric"
+         min="0"
+         step="1"
+         placeholder="例：500">
+  <span class="unit">円</span>
+</div>
+<label for="otherFee">その他交通費</label>
+<div class="input-wrap">
+  <input id="otherFee"
+         type="number"
+         inputmode="numeric"
+         min="0"
+         step="1"
+         placeholder="例：300">
+  <span class="unit">円</span>
+</div>
+    
+    
+    
 
     <button type="button" onclick="calculateCost()">
       車両交通費を計算する
@@ -349,7 +382,14 @@
 
     const fuelEfficiency =
       Number(document.getElementById("fuelEfficiency").value);
+　　const etcFee =
+  Number(document.getElementById("etcFee").value) || 0;
 
+const parkingFee =
+  Number(document.getElementById("parkingFee").value) || 0;
+
+const otherFee =
+  Number(document.getElementById("otherFee").value) || 0;
     const error =
       document.getElementById("error");
 
@@ -376,7 +416,8 @@
 
     const fuelCost =
       liters * fuelPrice;
-
+　　const totalCost =
+    fuelCost + etcFee + parkingFee + otherFee;
     const costPerKm =
       fuelPrice / fuelEfficiency;
 
@@ -387,7 +428,7 @@
       fuelType.options[fuelType.selectedIndex].text;
 
     document.getElementById("totalCost").textContent =
-      Math.round(fuelCost).toLocaleString("ja-JP") + "円";
+      Math.round(totalCost).toLocaleString("ja-JP") + "円";
 
     document.getElementById("detail").innerHTML =
       "燃料：" + fuelName + "<br>" +
@@ -398,7 +439,10 @@
       "燃料単価：" +
       fuelPrice.toLocaleString("ja-JP") + " 円/L<br>" +
       "1kmあたり燃料費：約 " +
-      costPerKm.toFixed(1) + " 円";
+      costPerKm.toFixed(1) + " 円/km<br>" +
+"ETC・高速道路料金：" + etcFee.toLocaleString("ja-JP") + " 円<br>" +
+"駐車料金：" + parkingFee.toLocaleString("ja-JP") + " 円<br>" +
+"その他交通費：" + otherFee.toLocaleString("ja-JP") + " 円";
 
     error.style.display = "none";
     result.style.display = "block";
