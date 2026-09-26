@@ -6,9 +6,7 @@
   <title>KYOUDAI 車両交通費計算</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -19,35 +17,35 @@
     }
 
     .container {
-      width: min(92%, 480px);
+      width: min(92%, 500px);
       margin: 0 auto;
-      padding: 28px 0 50px;
+      padding: 24px 0 50px;
     }
 
     .brand {
       text-align: center;
       font-size: 14px;
-      font-weight: 800;
-      letter-spacing: 3px;
+      font-weight: 900;
+      letter-spacing: 4px;
       margin-bottom: 8px;
     }
 
     h1 {
-      margin: 0 0 8px;
+      margin: 0;
       text-align: center;
       font-size: 28px;
     }
 
     .subtitle {
-      margin: 0 0 25px;
       text-align: center;
       color: #666;
       font-size: 14px;
       line-height: 1.7;
+      margin: 10px 0 22px;
     }
 
     .card {
-      background: white;
+      background: #fff;
       padding: 22px;
       border-radius: 18px;
       box-shadow: 0 6px 24px rgba(0,0,0,.08);
@@ -55,30 +53,32 @@
 
     label {
       display: block;
-      margin: 17px 0 7px;
-      font-weight: 700;
+      margin: 18px 0 7px;
+      font-weight: 800;
     }
 
-    label:first-child {
-      margin-top: 0;
+    label:first-child { margin-top: 0; }
+
+    input, select {
+      width: 100%;
+      padding: 15px 14px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      font-size: 17px;
+      background: white;
+    }
+
+    input:focus, select:focus {
+      outline: 2px solid #222;
+      border-color: #222;
     }
 
     .input-wrap {
       position: relative;
     }
 
-    input {
-      width: 100%;
-      padding: 15px 65px 15px 14px;
-      border: 1px solid #ccc;
-      border-radius: 10px;
-      font-size: 18px;
-      background: white;
-    }
-
-    input:focus {
-      outline: 2px solid #222;
-      border-color: #222;
+    .input-wrap input {
+      padding-right: 65px;
     }
 
     .unit {
@@ -90,6 +90,41 @@
       font-size: 14px;
     }
 
+    .trip-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .trip-buttons button {
+      margin: 0;
+      background: #eee;
+      color: #222;
+      border: 1px solid #ddd;
+    }
+
+    .trip-buttons button.active {
+      background: #111;
+      color: #fff;
+    }
+
+    .note {
+      margin-top: 7px;
+      color: #777;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .price-info {
+      margin-top: 8px;
+      padding: 12px;
+      background: #f5f6f8;
+      border-radius: 10px;
+      font-size: 13px;
+      color: #555;
+      line-height: 1.6;
+    }
+
     button {
       width: 100%;
       margin-top: 24px;
@@ -99,7 +134,7 @@
       background: #111;
       color: white;
       font-size: 18px;
-      font-weight: 800;
+      font-weight: 900;
       cursor: pointer;
     }
 
@@ -109,38 +144,41 @@
       padding: 20px;
       background: #f1f3f5;
       border-radius: 14px;
+    }
+
+    .result-main {
       text-align: center;
     }
 
     .result-title {
-      font-size: 14px;
       color: #666;
+      font-size: 14px;
     }
 
     .price {
-      margin-top: 5px;
+      margin: 4px 0 15px;
       font-size: 36px;
       font-weight: 900;
     }
 
     .detail {
-      margin-top: 12px;
-      color: #555;
+      border-top: 1px solid #ddd;
+      padding-top: 14px;
       font-size: 14px;
-      line-height: 1.7;
+      line-height: 1.9;
     }
 
     .error {
       display: none;
-      margin-top: 15px;
       color: #c00;
       text-align: center;
+      margin-top: 15px;
       font-size: 14px;
     }
 
     footer {
-      margin-top: 22px;
       text-align: center;
+      margin-top: 22px;
       color: #888;
       font-size: 12px;
     }
@@ -148,109 +186,224 @@
 </head>
 
 <body>
-  <main class="container">
 
-    <div class="brand">KYOUDAI</div>
+<main class="container">
 
-    <h1>車両交通費計算</h1>
+  <div class="brand">KYOUDAI</div>
+  <h1>車両交通費計算</h1>
 
-    <p class="subtitle">
-      距離・燃費・ガソリン価格を入力するだけ。<br>
-      燃料代をすぐ計算できます。
+  <p class="subtitle">
+    出発地と目的地から交通費をかんたん計算。<br>
+    難しい計算は必要ありません。
+  </p>
+
+  <div class="card">
+
+    <label for="start">出発地</label>
+    <input id="start" type="text"
+           placeholder="例：静岡市葵区">
+
+    <label for="destination">目的地</label>
+    <input id="destination" type="text"
+           placeholder="例：焼津市">
+
+    <p class="note">
+      ※住所からの距離自動取得は次のアップデートで接続します。
     </p>
 
-    <div class="card">
+    <label>片道・往復</label>
 
-      <label for="distance">走行距離</label>
-      <div class="input-wrap">
-        <input id="distance" type="number" inputmode="decimal"
-               min="0" step="0.1" placeholder="例：50">
-        <span class="unit">km</span>
-      </div>
-
-      <label for="fuelEfficiency">車の燃費</label>
-      <div class="input-wrap">
-        <input id="fuelEfficiency" type="number" inputmode="decimal"
-               min="0" step="0.1" placeholder="例：10">
-        <span class="unit">km/L</span>
-      </div>
-
-      <label for="gasPrice">ガソリン価格</label>
-      <div class="input-wrap">
-        <input id="gasPrice" type="number" inputmode="decimal"
-               min="0" step="0.1" placeholder="例：170">
-        <span class="unit">円/L</span>
-      </div>
-
-      <button type="button" onclick="calculateCost()">
-        計算する
+    <div class="trip-buttons">
+      <button type="button"
+              id="oneWay"
+              onclick="setTrip('oneway')">
+        片道
       </button>
 
-      <div id="error" class="error">
-        3項目すべてに0より大きい数字を入力してください。
+      <button type="button"
+              id="roundTrip"
+              class="active"
+              onclick="setTrip('round')">
+        往復
+      </button>
+    </div>
+
+    <label for="distance">片道の走行距離</label>
+
+    <div class="input-wrap">
+      <input id="distance"
+             type="number"
+             inputmode="decimal"
+             min="0"
+             step="0.1"
+             placeholder="例：50">
+      <span class="unit">km</span>
+    </div>
+
+    <label for="fuelType">燃料の種類</label>
+
+    <select id="fuelType" onchange="changeFuel()">
+      <option value="regular">レギュラー</option>
+      <option value="highoctane">ハイオク</option>
+      <option value="diesel">軽油</option>
+    </select>
+
+    <div class="price-info">
+      現在は参考価格を手動入力してください。<br>
+      最新価格の自動取得は次のアップデートで接続します。
+    </div>
+
+    <label for="fuelPrice">燃料価格</label>
+
+    <div class="input-wrap">
+      <input id="fuelPrice"
+             type="number"
+             inputmode="decimal"
+             min="0"
+             step="0.1"
+             placeholder="例：170">
+      <span class="unit">円/L</span>
+    </div>
+
+    <label for="fuelEfficiency">車の燃費</label>
+
+    <div class="input-wrap">
+      <input id="fuelEfficiency"
+             type="number"
+             inputmode="decimal"
+             min="0"
+             step="0.1"
+             placeholder="例：10">
+      <span class="unit">km/L</span>
+    </div>
+
+    <button type="button" onclick="calculateCost()">
+      車両交通費を計算する
+    </button>
+
+    <div id="error" class="error">
+      距離・燃料価格・燃費を入力してください。
+    </div>
+
+    <div id="result" class="result">
+
+      <div class="result-main">
+        <div class="result-title">今回の燃料交通費</div>
+        <div id="totalCost" class="price">0円</div>
       </div>
 
-      <div id="result" class="result">
-        <div class="result-title">燃料代</div>
-        <div id="fuelCost" class="price">0円</div>
-
-        <div id="detail" class="detail"></div>
-      </div>
+      <div id="detail" class="detail"></div>
 
     </div>
 
-    <footer>
-      © KYOUDAI
-    </footer>
+  </div>
 
-  </main>
+  <footer>
+    © KYOUDAI
+  </footer>
 
-  <script>
-    function calculateCost() {
-      const distance =
-        Number(document.getElementById("distance").value);
+</main>
 
-      const fuelEfficiency =
-        Number(document.getElementById("fuelEfficiency").value);
+<script>
+  let tripType = "round";
 
-      const gasPrice =
-        Number(document.getElementById("gasPrice").value);
+  function setTrip(type) {
+    tripType = type;
 
-      const result =
-        document.getElementById("result");
+    const oneWay = document.getElementById("oneWay");
+    const roundTrip = document.getElementById("roundTrip");
 
-      const error =
-        document.getElementById("error");
-
-      if (
-        distance <= 0 ||
-        fuelEfficiency <= 0 ||
-        gasPrice <= 0
-      ) {
-        result.style.display = "none";
-        error.style.display = "block";
-        return;
-      }
-
-      const liters = distance / fuelEfficiency;
-      const fuelCost = liters * gasPrice;
-      const costPerKm = gasPrice / fuelEfficiency;
-
-      document.getElementById("fuelCost").textContent =
-        Math.round(fuelCost).toLocaleString("ja-JP") + "円";
-
-      document.getElementById("detail").innerHTML =
-        "使用燃料：約 " +
-        liters.toFixed(2) +
-        " L<br>" +
-        "燃料費：約 " +
-        costPerKm.toFixed(1) +
-        " 円 / km";
-
-      error.style.display = "none";
-      result.style.display = "block";
+    if (type === "oneway") {
+      oneWay.classList.add("active");
+      roundTrip.classList.remove("active");
+    } else {
+      roundTrip.classList.add("active");
+      oneWay.classList.remove("active");
     }
-  </script>
+  }
+
+  function changeFuel() {
+    const type = document.getElementById("fuelType").value;
+    const price = document.getElementById("fuelPrice");
+
+    if (type === "regular") {
+      price.placeholder = "例：170";
+    }
+
+    if (type === "highoctane") {
+      price.placeholder = "例：181";
+    }
+
+    if (type === "diesel") {
+      price.placeholder = "例：158";
+    }
+  }
+
+  function calculateCost() {
+
+    const oneWayDistance =
+      Number(document.getElementById("distance").value);
+
+    const fuelPrice =
+      Number(document.getElementById("fuelPrice").value);
+
+    const fuelEfficiency =
+      Number(document.getElementById("fuelEfficiency").value);
+
+    const error =
+      document.getElementById("error");
+
+    const result =
+      document.getElementById("result");
+
+    if (
+      oneWayDistance <= 0 ||
+      fuelPrice <= 0 ||
+      fuelEfficiency <= 0
+    ) {
+      result.style.display = "none";
+      error.style.display = "block";
+      return;
+    }
+
+    const totalDistance =
+      tripType === "round"
+        ? oneWayDistance * 2
+        : oneWayDistance;
+
+    const liters =
+      totalDistance / fuelEfficiency;
+
+    const fuelCost =
+      liters * fuelPrice;
+
+    const costPerKm =
+      fuelPrice / fuelEfficiency;
+
+    const fuelType =
+      document.getElementById("fuelType");
+
+    const fuelName =
+      fuelType.options[fuelType.selectedIndex].text;
+
+    document.getElementById("totalCost").textContent =
+      Math.round(fuelCost).toLocaleString("ja-JP") + "円";
+
+    document.getElementById("detail").innerHTML =
+      "燃料：" + fuelName + "<br>" +
+      "走行距離：" +
+      totalDistance.toFixed(1) + " km<br>" +
+      "使用燃料：約 " +
+      liters.toFixed(2) + " L<br>" +
+      "燃料単価：" +
+      fuelPrice.toLocaleString("ja-JP") + " 円/L<br>" +
+      "1kmあたり燃料費：約 " +
+      costPerKm.toFixed(1) + " 円";
+
+    error.style.display = "none";
+    result.style.display = "block";
+  }
+</script>
 
 </body>
 </html>
