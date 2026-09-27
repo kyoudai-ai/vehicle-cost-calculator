@@ -95,6 +95,27 @@
       padding-right: 65px;
     }
 
+    .maintenance-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 18px 0 7px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .maintenance-toggle input {
+      width: 20px;
+      height: 20px;
+      margin: 0;
+      flex: none;
+    }
+
+    #maintenanceRate:disabled {
+      background: #f1f3f5 !important;
+      opacity: .65 !important;
+    }
+
     .unit {
       position: absolute;
       right: 14px;
@@ -194,6 +215,27 @@
       padding-top: 14px;
       font-size: 14px;
       line-height: 1.9;
+    }
+
+    .cost-breakdown {
+      margin-top: 12px;
+      border-top: 1px solid #ddd;
+      padding-top: 12px;
+    }
+
+    .cost-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .cost-row strong { white-space: nowrap; }
+
+    .cost-row.total {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #ddd;
+      font-weight: 900;
     }
 
     .error {
@@ -311,33 +353,39 @@
              placeholder="例：10">
       <span class="unit">km/L</span>
     </div>
-　　<label for="etcFee">ETC・高速道路料金</label>
-<div class="input-wrap">
-  <input id="etcFee"
-         type="number"
-         inputmode="numeric"
-         min="0"
-         step="1"
-         placeholder="例：1200">
-  <span class="unit">円</span>
-</div>
 
+    <label class="maintenance-toggle" for="addMaintenance">
+      <input id="addMaintenance" type="checkbox" onchange="toggleMaintenance()">
+      車両維持費を加算
+    </label>
+    <label for="maintenanceRate">車両維持費</label>
+    <div class="input-wrap">
+      <input id="maintenanceRate" type="number" inputmode="decimal"
+             min="0" step="0.1" placeholder="例：20" disabled>
+      <span class="unit">円/km</span>
+    </div>
+    <p class="note">ONの場合、片道・往復を反映した走行距離に加算します。</p>
 
-
-
+    <label for="etcFee">ETC・高速道路料金</label>
+    <div class="input-wrap">
+      <input id="etcFee" type="number" inputmode="numeric"
+             min="0" step="1" placeholder="例：1200">
+      <span class="unit">円</span>
+    </div>
+    <p class="note">今回の移動分の料金を入力してください。往復の場合も自動で倍にはしません。</p>
 
     <button type="button" onclick="calculateCost()">
       車両交通費を計算する
     </button>
 
     <div id="error" class="error">
-      距離・燃料価格・燃費を入力してください。
+      入力値を確認してください。
     </div>
 
     <div id="result" class="result">
 
       <div class="result-main">
-       <div class="result-title">今回の移動費目安</div>
+       <div class="result-title">合計車両コスト</div>
         <div id="totalCost" class="price">0円</div>
       </div>
 
@@ -477,6 +525,11 @@
     }
   }
 
+  function toggleMaintenance() {
+    document.getElementById("maintenanceRate").disabled =
+      !document.getElementById("addMaintenance").checked;
+  }
+
   function calculateCost() {
 
     const oneWayDistance =
@@ -487,8 +540,11 @@
 
     const fuelEfficiency =
       Number(document.getElementById("fuelEfficiency").value);
-　　const etcFee =
-  Number(document.getElementById("etcFee").value) || 0;
+    const etcInput = document.getElementById("etcFee").value.trim();
+    const etcFee = etcInput === "" ? 0 : Number(etcInput);
+    const addMaintenance = document.getElementById("addMaintenance").checked;
+    const rateInput = document.getElementById("maintenanceRate").value.trim();
+    const maintenanceRate = addMaintenance ? Number(rateInput) : 0;
 
 
     const error =
@@ -500,11 +556,16 @@
 
 
     if (
-      oneWayDistance <= 0 ||
-      fuelPrice <= 0 ||
-      fuelEfficiency <= 0
+      !Number.isFinite(oneWayDistance) || oneWayDistance <= 0 ||
+      !Number.isFinite(fuelPrice) || fuelPrice <= 0 ||
+      !Number.isFinite(fuelEfficiency) || fuelEfficiency <= 0 ||
+      !Number.isFinite(etcFee) || etcFee < 0 ||
+      (addMaintenance && (rateInput === "" || !Number.isFinite(maintenanceRate) || maintenanceRate < 0))
     ) {
       result.style.display = "none";
+      error.textContent = addMaintenance && rateInput === ""
+        ? "車両維持費を加算する場合は、円/kmを入力してください。"
+        : "距離・燃料価格・燃費・料金の入力値を確認してください。";
       error.style.display = "block";
       return;
     }
@@ -519,8 +580,8 @@
 
     const fuelCost =
       liters * fuelPrice;
-　　const totalCost =
-  fuelCost + etcFee;
+    const maintenanceCost = totalDistance * maintenanceRate;
+    const totalCost = fuelCost + maintenanceCost + etcFee;
     const costPerKm =
       fuelPrice / fuelEfficiency;
 
@@ -542,8 +603,16 @@
       "燃料単価：" +
       fuelPrice.toLocaleString("ja-JP") + " 円/L<br>" +
       "1kmあたり燃料費：約 " +
-      costPerKm.toFixed(1) + " 円/km<br>" +
-"ETC・高速道路料金：" + etcFee.toLocaleString("ja-JP") + " 円";
+      costPerKm.toFixed(1) + " 円/km" +
+      '<div class="cost-breakdown">' +
+      '<div class="cost-row"><span>燃料費</span><strong>' +
+      Math.round(fuelCost).toLocaleString("ja-JP") + ' 円</strong></div>' +
+      '<div class="cost-row"><span>車両維持費</span><strong>' +
+      Math.round(maintenanceCost).toLocaleString("ja-JP") + ' 円</strong></div>' +
+      '<div class="cost-row"><span>ETC・高速道路料金</span><strong>' +
+      Math.round(etcFee).toLocaleString("ja-JP") + ' 円</strong></div>' +
+      '<div class="cost-row total"><span>合計車両コスト</span><strong>' +
+      Math.round(totalCost).toLocaleString("ja-JP") + ' 円</strong></div></div>';
 
 
     error.style.display = "none";
