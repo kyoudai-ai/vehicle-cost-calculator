@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KYOUDAI 車両交通費計算 V2テスト</title>
+  <meta name="robots" content="noindex, nofollow">
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+
+                   "Noto Sans JP", sans-serif;
+      background: #f5f6f8;
+      color: #222;
+    }
+
+    .container {
+      width: min(92%, 500px);
+      margin: 0 auto;
+      padding: 24px 0 50px;
+    }
+
+    .brand {
+      text-align: center;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      margin: 0;
+      text-align: center;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+      line-height: 1.7;
+      margin: 10px 0 22px;
+    }
+
+    .card {
+      background: #fff;
+      padding: 22px;
+      border-radius: 18px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.08);
+    }
+
+    label {
+      display: block;
+      margin: 18px 0 7px;
+      font-weight: 800;
+    }
+
+    label:first-child { margin-top: 0; }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 15px 14px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      font-size: 17px;
+      background: #fff !important;
+      color: #111 !important;
+      color-scheme: light;
+      -webkit-text-fill-color: #111 !important;
+      opacity: 1 !important;
+      caret-color: #111;
+    }
+
+    input::placeholder {
+      color: #888;
+      -webkit-text-fill-color: #888;
+      opacity: 1;
+    }
+
+    input:focus, select:focus {
+      outline: 2px solid #222;
+      border-color: #222;
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+
+    .input-wrap input {
+      padding-right: 65px;
+    }
+
+    .unit {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #666;
+      font-size: 14px;
+    }
+
+    .trip-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .trip-buttons button {
+      margin: 0;
+      background: #eee;
+      color: #222;
+      border: 1px solid #ddd;
+    }
+
+    .trip-buttons button.active {
+      background: #111;
+      color: #fff;
+    }
+
+    .note {
+      margin-top: 7px;
+      color: #777;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .route-status {
+      margin: 10px 0 0;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #555;
+    }
+
+    .route-status[aria-invalid="true"] { color: #b00020; }
+
+    #lookupDistance:disabled { opacity: .6; cursor: wait; }
+
+    .price-info {
+      margin-top: 8px;
+      padding: 12px;
+      background: #f5f6f8;
+      border-radius: 10px;
+      font-size: 13px;
+      color: #555;
+      line-height: 1.6;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 24px;
+      padding: 16px;
+      border: 0;
+      border-radius: 12px;
+      background: #111;
+      color: white;
+      font-size: 18px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+#businessEstimateButton {
+  display: block;
+  margin-top: 14px;
+}
+    .result {
+      display: none;
+      margin-top: 20px;
+      padding: 20px;
+      background: #f1f3f5;
+      border-radius: 14px;
+    }
+
+    .result-main {
+      text-align: center;
+    }
+
+    .result-title {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .price {
+      margin: 4px 0 15px;
+      font-size: 36px;
+      font-weight: 900;
+    }
+
+    .detail {
+      border-top: 1px solid #ddd;
+      padding-top: 14px;
+      font-size: 14px;
+      line-height: 1.9;
+    }
+
+    .error {
+      display: none;
+      color: #c00;
+      text-align: center;
+      margin-top: 15px;
+      font-size: 14px;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 22px;
+      color: #888;
+      font-size: 12px;
+    }
+  </style>
+</head>
+
+<body>
+
+<main class="container">
+
+  <div class="brand">KYOUDAI</div>
+  <h1>車両交通費計算</h1>
+
+  <p class="subtitle">
+    出発地と目的地から交通費をかんたん計算。<br>
+    難しい計算は必要ありません。
+  </p>
+
+  <div class="card">
+
+    <label for="start">出発地</label>
+    <input id="start" type="text"
+           placeholder="例：静岡市葵区">
+
+    <label for="destination">目的地</label>
+    <input id="destination" type="text"
+           placeholder="例：焼津市">
+
+    <button type="button" id="lookupDistance" onclick="lookupDrivingDistance()">
+      車での走行距離を取得
+    </button>
+    <p id="routeStatus" class="route-status" role="status" aria-live="polite">
+      住所を入力して取得してください。距離は手入力・修正もできます。
+    </p>
+    <p class="note">
+      経路距離は目安です。実際の道路状況や通行料金は反映されません。<br>
+      住所検索：Nominatim、経路：OSRM、地図データ：© OpenStreetMap contributors
+    </p>
+
+    <label>片道・往復</label>
+
+    <div class="trip-buttons">
+      <button type="button"
+              id="oneWay"
+              onclick="setTrip('oneway')">
+        片道
+      </button>
+
+      <button type="button"
+              id="roundTrip"
+              class="active"
+              onclick="setTrip('round')">
+        往復
+      </button>
+    </div>
+
+    <label for="distance">片道の走行距離</label>
+
+    <div class="input-wrap">
+      <input id="distance"
+             type="number"
+             inputmode="decimal"
+             min="0"
+             step="0.1"
+             placeholder="例：50">
+      <span class="unit">km</span>
+    </div>
+
+    <label for="fuelType">燃料の種類</label>
+
+    <select id="fuelType" onchange="changeFuel()">
+      <option value="regular">レギュラー</option>
+      <option value="highoctane">ハイオク</option>
+      <option value="diesel">軽油</option>
+    </select>
+
+    <div class="price-info">
+      現在は参考価格を手動入力してください。<br>
+      最新価格の自動取得は次のアップデートで接続します。
+    </div>
+
+    <label for="fuelPrice">燃料価格</label>
+
+    <div class="input-wrap">
+      <input id="fuelPrice"
+             type="number"
+             inputmode="decimal"
+             min="0"
+             step="0.1"
+             placeholder="例：170">
+      <span class="unit">円/L</span>
+    </div>
+
+    <label for="fuelEfficiency">車の燃費</label>
+
+    <div class="input-wrap">
+      <input id="fuelEfficiency"
+             type="number"
+             inputmode="decimal"
+             min="0"
+             step="0.1"
+             placeholder="例：10">
+      <span class="unit">km/L</span>
+    </div>
+　　<label for="etcFee">ETC・高速道路料金</label>
+<div class="input-wrap">
+  <input id="etcFee"
+         type="number"
+         inputmode="numeric"
+         min="0"
+         step="1"
+         placeholder="例：1200">
+  <span class="unit">円</span>
+</div>
+
+
+
+
+
+    <button type="button" onclick="calculateCost()">
+      車両交通費を計算する
+    </button>
+
+    <div id="error" class="error">
+      距離・燃料価格・燃費を入力してください。
+    </div>
+
+    <div id="result" class="result">
+
+      <div class="result-main">
+       <div class="result-title">今回の移動費目安</div>
+        <div id="totalCost" class="price">0円</div>
+      </div>
+
+     <div id="detail" class="detail"></div>
+
+<button type="button" id="businessEstimateButton">
+  業者向け見積計算へ
+</button>
+    </div>
+
+
+  </div>
+
+  <footer>
+    © KYOUDAI
+  </footer>
+
+</main>
+
+<script>
+  let tripType = "round";
+
+  let routeRequestId = 0;
+
+  // 公開デモの利用条件に合わせ、住所検索はボタン操作時だけ行う。
+  const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  async function getJson(url, signal, stage) {
+    try {
+      const response = await fetch(url, { signal });
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return await response.json();
+    } catch (error) {
+      if (error.name === "AbortError") {
+        error.stage = stage;
+        throw error;
+      }
+      throw new Error(stage + "で通信に失敗しました（" + error.message + "）");
+    }
+  }
+
+  async function geocodeAddress(address, signal, stage) {
+    const query = /日本|Japan/i.test(address) ? address : address + ", 日本";
+    const url = "https://nominatim.openstreetmap.org/search?" +
+      new URLSearchParams({ q: query, format: "json", limit: "1", countrycodes: "jp" });
+    const results = await getJson(url, signal, stage);
+    const point = results[0];
+    if (!point || !Number.isFinite(Number(point.lon)) || !Number.isFinite(Number(point.lat))) {
+      throw new Error("住所が見つかりませんでした");
+    }
+    return [Number(point.lon), Number(point.lat)];
+  }
+
+  async function lookupDrivingDistance() {
+    const start = document.getElementById("start").value.trim();
+    const destination = document.getElementById("destination").value.trim();
+    const distance = document.getElementById("distance");
+    const status = document.getElementById("routeStatus");
+    const button = document.getElementById("lookupDistance");
+
+    if (!start || !destination) {
+      status.textContent = "出発地と目的地の両方を入力してください。距離は手入力もできます。";
+      status.setAttribute("aria-invalid", "true");
+      return;
+    }
+
+    const requestId = ++routeRequestId;
+    const previousDistance = distance.value;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    button.disabled = true;
+    status.removeAttribute("aria-invalid");
+    status.textContent = "車での走行距離を調べています…";
+
+    try {
+      const origin = await geocodeAddress(start, controller.signal, "出発地の住所検索（Nominatim）");
+      // Nominatim の公開サービスは最大 1 リクエスト/秒。
+      await pause(1100);
+      const target = await geocodeAddress(destination, controller.signal, "目的地の住所検索（Nominatim）");
+      const coordinates = [origin, target].map(point => point.join(",")).join(";");
+      const url = "https://router.project-osrm.org/route/v1/driving/" +
+        coordinates + "?overview=false";
+      const route = await getJson(url, controller.signal, "車の経路取得（OSRM）");
+      const meters = route.routes?.[0]?.distance;
+      if (route.code !== "Ok" || !Number.isFinite(meters) || meters <= 0) {
+        throw new Error("車で通れる経路が見つかりませんでした");
+      }
+      // 検索中に住所や距離が変更された場合は、入力済みの値を上書きしない。
+      if (requestId !== routeRequestId || distance.value !== previousDistance ||
+          start !== document.getElementById("start").value.trim() ||
+          destination !== document.getElementById("destination").value.trim()) {
+        status.textContent = "入力が変更されたため、取得結果は反映していません。";
+        return;
+      }
+      distance.value = (meters / 1000).toFixed(1);
+      status.textContent = "片道の車での走行距離を反映しました。必要なら距離を修正できます。";
+    } catch (error) {
+      status.setAttribute("aria-invalid", "true");
+      status.textContent = (error.name === "AbortError"
+        ? error.stage + "が時間切れになりました。"
+        : error.message) + " 距離を手入力して計算できます。";
+    } finally {
+      clearTimeout(timeout);
+      if (requestId === routeRequestId) button.disabled = false;
+    }
+  }
+
+  function setTrip(type) {
+    tripType = type;
+
+    const oneWay = document.getElementById("oneWay");
+    const roundTrip = document.getElementById("roundTrip");
+
+    if (type === "oneway") {
+      oneWay.classList.add("active");
+      roundTrip.classList.remove("active");
+    } else {
+      roundTrip.classList.add("active");
+      oneWay.classList.remove("active");
+    }
+  }
+
+  function changeFuel() {
+    const type = document.getElementById("fuelType").value;
+    const price = document.getElementById("fuelPrice");
+
+    if (type === "regular") {
+      price.placeholder = "例：170";
+    }
+
+    if (type === "highoctane") {
+      price.placeholder = "例：181";
+    }
+
+    if (type === "diesel") {
+      price.placeholder = "例：158";
+    }
+  }
+
+  function calculateCost() {
+
+    const oneWayDistance =
+      Number(document.getElementById("distance").value);
+
+    const fuelPrice =
+      Number(document.getElementById("fuelPrice").value);
+
+    const fuelEfficiency =
+      Number(document.getElementById("fuelEfficiency").value);
+　　const etcFee =
+  Number(document.getElementById("etcFee").value) || 0;
+
+
+    const error =
+      document.getElementById("error");
+
+    const result =
+      document.getElementById("result");
+
+
+
+    if (
+      oneWayDistance <= 0 ||
+      fuelPrice <= 0 ||
+      fuelEfficiency <= 0
+    ) {
+      result.style.display = "none";
+      error.style.display = "block";
+      return;
+    }
+
+    const totalDistance =
+      tripType === "round"
+        ? oneWayDistance * 2
+        : oneWayDistance;
+
+    const liters =
+      totalDistance / fuelEfficiency;
+
+    const fuelCost =
+      liters * fuelPrice;
+　　const totalCost =
+  fuelCost + etcFee;
+    const costPerKm =
+      fuelPrice / fuelEfficiency;
+
+    const fuelType =
+      document.getElementById("fuelType");
+
+    const fuelName =
+      fuelType.options[fuelType.selectedIndex].text;
+
+    document.getElementById("totalCost").textContent =
+      Math.round(totalCost).toLocaleString("ja-JP") + "円";
+
+    document.getElementById("detail").innerHTML =
+      "燃料：" + fuelName + "<br>" +
+      "走行距離：" +
+      totalDistance.toFixed(1) + " km<br>" +
+      "使用燃料：約 " +
+      liters.toFixed(2) + " L<br>" +
+      "燃料単価：" +
+      fuelPrice.toLocaleString("ja-JP") + " 円/L<br>" +
+      "1kmあたり燃料費：約 " +
+      costPerKm.toFixed(1) + " 円/km<br>" +
+"ETC・高速道路料金：" + etcFee.toLocaleString("ja-JP") + " 円";
+
+
+    error.style.display = "none";
+    result.style.display = "block";
+document.getElementById("businessEstimateButton").style.display = "block";
+ }
+</script>
+
+</body>
+</html>
