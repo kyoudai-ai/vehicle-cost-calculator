@@ -325,9 +325,8 @@
       <option value="diesel">軽油</option>
     </select>
 
-    <div class="price-info">
-      現在は参考価格を手動入力してください。<br>
-      最新価格の自動取得は次のアップデートで接続します。
+    <div id="fuelReferenceInfo" class="price-info" aria-live="polite">
+      全国平均の参考価格（調査日未設定）／実際の給油価格とは異なります。
     </div>
 
     <label for="fuelPrice">燃料価格</label>
@@ -338,7 +337,7 @@
              inputmode="decimal"
              min="0"
              step="0.1"
-             placeholder="例：170">
+             placeholder="価格を入力">
       <span class="unit">円/L</span>
     </div>
 
@@ -409,6 +408,13 @@
   let tripType = "round";
 
   let routeRequestId = 0;
+
+  // 全国平均の参考価格。実際の給油価格に応じて入力欄で修正できる。
+  const fuelReferences = {
+    regular: { price: 169.9, surveyDate: "2026-09-14" },
+    highoctane: { price: 180.8, surveyDate: "2026-09-14" },
+    diesel: { price: 159.3, surveyDate: "2026-09-14" }
+  };
 
   // 公開デモの利用条件に合わせ、住所検索はボタン操作時だけ行う。
   const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -511,17 +517,26 @@
   function changeFuel() {
     const type = document.getElementById("fuelType").value;
     const price = document.getElementById("fuelPrice");
+    const info = document.getElementById("fuelReferenceInfo");
+    const reference = fuelReferences[type];
+    const validDate = reference && typeof reference.surveyDate === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(reference.surveyDate) &&
+      !Number.isNaN(Date.parse(reference.surveyDate)) &&
+      new Date(reference.surveyDate).toISOString().slice(0, 10) === reference.surveyDate;
+    const validPrice = reference && typeof reference.price === "number" &&
+      Number.isFinite(reference.price) && reference.price > 0;
 
-    if (type === "regular") {
-      price.placeholder = "例：170";
-    }
-
-    if (type === "highoctane") {
-      price.placeholder = "例：181";
-    }
-
-    if (type === "diesel") {
-      price.placeholder = "例：158";
+    if (validDate && validPrice) {
+      price.value = String(reference.price);
+      const [year, month, day] = reference.surveyDate.split("-");
+      info.textContent = "全国平均の参考価格（調査日 " +
+        year + "/" + Number(month) + "/" + Number(day) +
+        "）／実際の給油価格とは異なります";
+    } else {
+      // 油種を切り替えた際、別の油種の価格を使い続けない。
+      price.value = "";
+      info.textContent = "全国平均の参考価格（調査日未設定）／" +
+        "実際の給油価格とは異なります。燃料価格を手入力してください。";
     }
   }
 
@@ -619,6 +634,8 @@
     result.style.display = "block";
 document.getElementById("businessEstimateButton").style.display = "block";
  }
+
+  changeFuel();
 </script>
 
 </body>
