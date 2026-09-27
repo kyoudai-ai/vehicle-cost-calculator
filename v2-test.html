@@ -183,10 +183,21 @@
       font-weight: 900;
       cursor: pointer;
     }
-#businessEstimateButton {
-  display: block;
-  margin-top: 14px;
-}
+    #businessEstimateButton { margin-top: 14px; }
+
+    .business-panel {
+      display: none;
+      margin-top: 20px;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 14px;
+    }
+
+    .business-panel h2 { margin: 0; font-size: 20px; }
+
+    .business-panel details { margin-top: 18px; }
+
+    .business-panel summary { cursor: pointer; font-weight: 800; }
     .result {
       display: none;
       margin-top: 20px;
@@ -390,11 +401,59 @@
 
      <div id="detail" class="detail"></div>
 
-<button type="button" id="businessEstimateButton">
+<button type="button" id="businessEstimateButton" onclick="openBusinessEstimate()">
   業者向け見積計算へ
 </button>
     </div>
 
+    <section id="businessPanel" class="business-panel" aria-label="業者向け見積計算">
+      <h2>業者向け見積計算</h2>
+      <p class="note">現在の車両コストに、移動時間の人件費を加算します。</p>
+
+      <label for="travelMinutes">車での片道移動時間</label>
+      <div class="input-wrap">
+        <input id="travelMinutes" type="number" inputmode="numeric"
+               min="0" step="1" placeholder="分を入力" oninput="markTimeManual()">
+        <span class="unit">分</span>
+      </div>
+      <p class="note">経路取得時の時間は目安です。取得できない場合も手入力できます。</p>
+
+      <label for="passengers">乗車人数（運転者を含む）</label>
+      <div class="input-wrap">
+        <input id="passengers" type="number" inputmode="numeric"
+               min="1" step="1" value="1">
+        <span class="unit">人</span>
+      </div>
+
+      <label for="hourlyRate">1人あたり時間単価</label>
+      <div class="input-wrap">
+        <input id="hourlyRate" type="number" inputmode="decimal"
+               min="0" step="1" value="4375">
+        <span class="unit">円/時間</span>
+      </div>
+      <p class="note">初期値は1人工35,000円÷8時間です。会社の単価に合わせて変更できます。</p>
+
+      <details>
+        <summary>詳細設定（任意）</summary>
+        <label for="overheadRate">諸経費加算率</label>
+        <div class="input-wrap">
+          <input id="overheadRate" type="number" inputmode="decimal"
+                 min="0" step="0.1" value="0">
+          <span class="unit">%</span>
+        </div>
+      </details>
+
+      <button type="button" onclick="calculateBusinessEstimate()">客先請求額を計算する</button>
+      <div id="businessError" class="error" role="alert"></div>
+      <div id="businessResult" class="result" aria-live="polite">
+        <div class="result-main">
+          <div class="result-title">客先請求額</div>
+          <div id="businessTotal" class="price">0円</div>
+        </div>
+        <div id="businessDetail" class="detail"></div>
+        <p class="note">現場作業の人工代に移動時間を含める場合は、二重計上にご注意ください。</p>
+      </div>
+    </section>
 
   </div>
 
@@ -408,6 +467,9 @@
   let tripType = "round";
 
   let routeRequestId = 0;
+  let timeSource = "manual";
+  let vehicleCostForEstimate = null;
+  let tripForEstimate = "round";
 
   // 全国平均の参考価格。実際の給油価格に応じて入力欄で修正できる。
   const fuelReferences = {
@@ -449,6 +511,7 @@
     const start = document.getElementById("start").value.trim();
     const destination = document.getElementById("destination").value.trim();
     const distance = document.getElementById("distance");
+    const travelMinutes = document.getElementById("travelMinutes");
     const status = document.getElementById("routeStatus");
     const button = document.getElementById("lookupDistance");
 
@@ -460,6 +523,7 @@
 
     const requestId = ++routeRequestId;
     const previousDistance = distance.value;
+    const previousTime = travelMinutes.value;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     button.disabled = true;
@@ -476,6 +540,7 @@
         coordinates + "?overview=false";
       const route = await getJson(url, controller.signal, "車の経路取得（OSRM）");
       const meters = route.routes?.[0]?.distance;
+      const seconds = route.routes?.[0]?.duration;
       if (route.code !== "Ok" || !Number.isFinite(meters) || meters <= 0) {
         throw new Error("車で通れる経路が見つかりませんでした");
       }
@@ -487,16 +552,34 @@
         return;
       }
       distance.value = (meters / 1000).toFixed(1);
-      status.textContent = "片道の車での走行距離を反映しました。必要なら距離を修正できます。";
+      if (Number.isFinite(seconds) && seconds > 0 && travelMinutes.value === previousTime) {
+        travelMinutes.value = String(Math.max(1, Math.round(seconds / 60)));
+        timeSource = "auto";
+        status.textContent = "片道の走行距離と移動時間を反映しました。どちらも修正できます。";
+      } else {
+        if (timeSource === "auto" && travelMinutes.value === previousTime) {
+          travelMinutes.value = "";
+          timeSource = "manual";
+        }
+        status.textContent = "片道の走行距離を反映しました。移動時間は業者向け画面で確認・手入力できます。";
+      }
     } catch (error) {
+      if (timeSource === "auto" && travelMinutes.value === previousTime) {
+        travelMinutes.value = "";
+        timeSource = "manual";
+      }
       status.setAttribute("aria-invalid", "true");
       status.textContent = (error.name === "AbortError"
         ? error.stage + "が時間切れになりました。"
-        : error.message) + " 距離を手入力して計算できます。";
+        : error.message) + " 距離と移動時間を手入力して計算できます。";
     } finally {
       clearTimeout(timeout);
       if (requestId === routeRequestId) button.disabled = false;
     }
+  }
+
+  function markTimeManual() {
+    timeSource = "manual";
   }
 
   function setTrip(type) {
@@ -577,6 +660,8 @@
       !Number.isFinite(etcFee) || etcFee < 0 ||
       (addMaintenance && (rateInput === "" || !Number.isFinite(maintenanceRate) || maintenanceRate < 0))
     ) {
+      vehicleCostForEstimate = null;
+      document.getElementById("businessPanel").style.display = "none";
       result.style.display = "none";
       error.textContent = addMaintenance && rateInput === ""
         ? "車両維持費を加算する場合は、円/kmを入力してください。"
@@ -597,6 +682,9 @@
       liters * fuelPrice;
     const maintenanceCost = totalDistance * maintenanceRate;
     const totalCost = fuelCost + maintenanceCost + etcFee;
+    vehicleCostForEstimate = Math.round(totalCost);
+    tripForEstimate = tripType;
+    document.getElementById("businessResult").style.display = "none";
     const costPerKm =
       fuelPrice / fuelEfficiency;
 
@@ -634,6 +722,64 @@
     result.style.display = "block";
 document.getElementById("businessEstimateButton").style.display = "block";
  }
+
+  function openBusinessEstimate() {
+    // 元の入力が変わっている場合も、車両コストを最新の値で計算し直す。
+    calculateCost();
+    if (vehicleCostForEstimate === null) return;
+    const panel = document.getElementById("businessPanel");
+    panel.style.display = "block";
+    panel.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }
+
+  function calculateBusinessEstimate() {
+    calculateCost();
+    if (vehicleCostForEstimate === null) return;
+    const minutesInput = document.getElementById("travelMinutes").value.trim();
+    const passengersInput = document.getElementById("passengers").value.trim();
+    const hourlyInput = document.getElementById("hourlyRate").value.trim();
+    const overheadInput = document.getElementById("overheadRate").value.trim();
+    const minutes = Number(minutesInput);
+    const passengers = Number(passengersInput);
+    const hourlyRate = Number(hourlyInput);
+    const overheadRate = overheadInput === "" ? 0 : Number(overheadInput);
+    const error = document.getElementById("businessError");
+    const result = document.getElementById("businessResult");
+
+    if (vehicleCostForEstimate === null || minutesInput === "" ||
+        !Number.isFinite(minutes) || minutes <= 0 ||
+        passengersInput === "" || !Number.isInteger(passengers) || passengers < 1 ||
+        hourlyInput === "" || !Number.isFinite(hourlyRate) || hourlyRate <= 0 ||
+        !Number.isFinite(overheadRate) || overheadRate < 0) {
+      result.style.display = "none";
+      error.textContent = "片道移動時間・乗車人数・時間単価・諸経費率を確認してください。";
+      error.style.display = "block";
+      return;
+    }
+
+    const multiplier = tripForEstimate === "round" ? 2 : 1;
+    const totalMinutes = minutes * multiplier;
+    const laborCost = Math.round(totalMinutes / 60 * passengers * hourlyRate);
+    const baseAmount = vehicleCostForEstimate + laborCost;
+    const overheadCost = Math.round(baseAmount * overheadRate / 100);
+    const customerAmount = baseAmount + overheadCost;
+    const yen = amount => amount.toLocaleString("ja-JP") + " 円";
+
+    document.getElementById("businessTotal").textContent =
+      customerAmount.toLocaleString("ja-JP") + "円";
+    document.getElementById("businessDetail").innerHTML =
+      '<div class="cost-row"><span>車両コスト</span><strong>' + yen(vehicleCostForEstimate) + '</strong></div>' +
+      '<div class="cost-row"><span>移動時間</span><strong>' +
+      minutes.toLocaleString("ja-JP") + ' 分（' + (multiplier === 2 ? '往復 ' : '片道 ') +
+      totalMinutes.toLocaleString("ja-JP") + ' 分）</strong></div>' +
+      '<div class="cost-row"><span>乗車人数</span><strong>' + passengers + ' 人</strong></div>' +
+      '<div class="cost-row"><span>移動人件費</span><strong>' + yen(laborCost) + '</strong></div>' +
+      (overheadRate > 0 ? '<div class="cost-row"><span>諸経費（' + overheadRate +
+        '%）</span><strong>' + yen(overheadCost) + '</strong></div>' : '') +
+      '<div class="cost-row total"><span>客先請求額</span><strong>' + yen(customerAmount) + '</strong></div>';
+    error.style.display = "none";
+    result.style.display = "block";
+  }
 
   changeFuel();
 </script>
