@@ -183,7 +183,15 @@
       font-weight: 900;
       cursor: pointer;
     }
-    #businessEstimateButton { margin-top: 14px; }
+    .labor-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+
+    .labor-toggle input { width: 20px; height: 20px; margin: 0; flex: none; }
 
     .business-panel {
       display: none;
@@ -364,18 +372,6 @@
       <span class="unit">km/L</span>
     </div>
 
-    <label class="maintenance-toggle" for="addMaintenance">
-      <input id="addMaintenance" type="checkbox" onchange="toggleMaintenance()">
-      車両維持費を加算
-    </label>
-    <label for="maintenanceRate">車両維持費</label>
-    <div class="input-wrap">
-      <input id="maintenanceRate" type="number" inputmode="decimal"
-             min="0" step="0.1" placeholder="例：20" disabled>
-      <span class="unit">円/km</span>
-    </div>
-    <p class="note">ONの場合、片道・往復を反映した走行距離に加算します。</p>
-
     <label for="etcFee">ETC・高速道路料金</label>
     <div class="input-wrap">
       <input id="etcFee" type="number" inputmode="numeric"
@@ -395,20 +391,38 @@
     <div id="result" class="result">
 
       <div class="result-main">
-       <div class="result-title">合計車両コスト</div>
+       <div class="result-title">合計車両交通費</div>
         <div id="totalCost" class="price">0円</div>
       </div>
 
      <div id="detail" class="detail"></div>
 
-<button type="button" id="businessEstimateButton" onclick="openBusinessEstimate()">
-  業者向け見積計算へ
-</button>
+      <button type="button" onclick="openBusinessEstimate()">業者向け見積計算へ</button>
     </div>
 
     <section id="businessPanel" class="business-panel" aria-label="業者向け見積計算">
       <h2>業者向け見積計算</h2>
-      <p class="note">現在の車両コストに、移動時間の人件費を加算します。</p>
+      <p class="note">必要な費用だけを選んで、客先請求額を計算できます。</p>
+
+      <label class="maintenance-toggle" for="addMaintenance">
+        <input id="addMaintenance" type="checkbox" onchange="toggleMaintenance()">
+        車両維持費を加算
+      </label>
+      <div id="maintenanceFields" style="display:none">
+        <label for="maintenanceRate">車両維持費</label>
+        <div class="input-wrap">
+          <input id="maintenanceRate" type="number" inputmode="decimal"
+                 min="0" step="0.1" placeholder="例：20" disabled>
+          <span class="unit">円/km</span>
+        </div>
+        <p class="note">片道・往復を反映した走行距離に加算します。</p>
+      </div>
+
+      <label class="labor-toggle" for="addTravelLabor">
+        <input id="addTravelLabor" type="checkbox" onchange="toggleTravelLabor()">
+        移動人件費を加算
+      </label>
+      <div id="travelLaborFields" style="display:none">
 
       <label for="travelMinutes">車での片道移動時間</label>
       <div class="input-wrap">
@@ -432,6 +446,7 @@
         <span class="unit">円/時間</span>
       </div>
       <p class="note">初期値は1人工35,000円÷8時間です。会社の単価に合わせて変更できます。</p>
+      </div>
 
       <details>
         <summary>詳細設定（任意）</summary>
@@ -469,6 +484,7 @@
   let routeRequestId = 0;
   let timeSource = "manual";
   let vehicleCostForEstimate = null;
+  let vehicleCostRawForEstimate = null;
   let tripForEstimate = "round";
 
   // 全国平均の参考価格。実際の給油価格に応じて入力欄で修正できる。
@@ -624,8 +640,10 @@
   }
 
   function toggleMaintenance() {
-    document.getElementById("maintenanceRate").disabled =
-      !document.getElementById("addMaintenance").checked;
+    const enabled = document.getElementById("addMaintenance").checked;
+    document.getElementById("maintenanceRate").disabled = !enabled;
+    document.getElementById("maintenanceFields").style.display = enabled ? "block" : "none";
+    document.getElementById("businessResult").style.display = "none";
   }
 
   function calculateCost() {
@@ -640,11 +658,6 @@
       Number(document.getElementById("fuelEfficiency").value);
     const etcInput = document.getElementById("etcFee").value.trim();
     const etcFee = etcInput === "" ? 0 : Number(etcInput);
-    const addMaintenance = document.getElementById("addMaintenance").checked;
-    const rateInput = document.getElementById("maintenanceRate").value.trim();
-    const maintenanceRate = addMaintenance ? Number(rateInput) : 0;
-
-
     const error =
       document.getElementById("error");
 
@@ -657,15 +670,13 @@
       !Number.isFinite(oneWayDistance) || oneWayDistance <= 0 ||
       !Number.isFinite(fuelPrice) || fuelPrice <= 0 ||
       !Number.isFinite(fuelEfficiency) || fuelEfficiency <= 0 ||
-      !Number.isFinite(etcFee) || etcFee < 0 ||
-      (addMaintenance && (rateInput === "" || !Number.isFinite(maintenanceRate) || maintenanceRate < 0))
+      !Number.isFinite(etcFee) || etcFee < 0
     ) {
       vehicleCostForEstimate = null;
+      vehicleCostRawForEstimate = null;
       document.getElementById("businessPanel").style.display = "none";
       result.style.display = "none";
-      error.textContent = addMaintenance && rateInput === ""
-        ? "車両維持費を加算する場合は、円/kmを入力してください。"
-        : "距離・燃料価格・燃費・料金の入力値を確認してください。";
+      error.textContent = "距離・燃料価格・燃費・料金の入力値を確認してください。";
       error.style.display = "block";
       return;
     }
@@ -680,9 +691,9 @@
 
     const fuelCost =
       liters * fuelPrice;
-    const maintenanceCost = totalDistance * maintenanceRate;
-    const totalCost = fuelCost + maintenanceCost + etcFee;
+    const totalCost = fuelCost + etcFee;
     vehicleCostForEstimate = Math.round(totalCost);
+    vehicleCostRawForEstimate = totalCost;
     tripForEstimate = tripType;
     document.getElementById("businessResult").style.display = "none";
     const costPerKm =
@@ -710,21 +721,17 @@
       '<div class="cost-breakdown">' +
       '<div class="cost-row"><span>燃料費</span><strong>' +
       Math.round(fuelCost).toLocaleString("ja-JP") + ' 円</strong></div>' +
-      '<div class="cost-row"><span>車両維持費</span><strong>' +
-      Math.round(maintenanceCost).toLocaleString("ja-JP") + ' 円</strong></div>' +
       '<div class="cost-row"><span>ETC・高速道路料金</span><strong>' +
       Math.round(etcFee).toLocaleString("ja-JP") + ' 円</strong></div>' +
-      '<div class="cost-row total"><span>合計車両コスト</span><strong>' +
+      '<div class="cost-row total"><span>合計車両交通費</span><strong>' +
       Math.round(totalCost).toLocaleString("ja-JP") + ' 円</strong></div></div>';
 
 
     error.style.display = "none";
     result.style.display = "block";
-document.getElementById("businessEstimateButton").style.display = "block";
  }
 
   function openBusinessEstimate() {
-    // 元の入力が変わっている場合も、車両コストを最新の値で計算し直す。
     calculateCost();
     if (vehicleCostForEstimate === null) return;
     const panel = document.getElementById("businessPanel");
@@ -732,9 +739,20 @@ document.getElementById("businessEstimateButton").style.display = "block";
     panel.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }
 
+  function toggleTravelLabor() {
+    const enabled = document.getElementById("addTravelLabor").checked;
+    document.getElementById("travelLaborFields").style.display = enabled ? "block" : "none";
+    document.getElementById("businessResult").style.display = "none";
+    document.getElementById("businessError").style.display = "none";
+  }
+
   function calculateBusinessEstimate() {
     calculateCost();
     if (vehicleCostForEstimate === null) return;
+    const addMaintenance = document.getElementById("addMaintenance").checked;
+    const maintenanceInput = document.getElementById("maintenanceRate").value.trim();
+    const maintenanceRate = addMaintenance ? Number(maintenanceInput) : 0;
+    const addTravelLabor = document.getElementById("addTravelLabor").checked;
     const minutesInput = document.getElementById("travelMinutes").value.trim();
     const passengersInput = document.getElementById("passengers").value.trim();
     const hourlyInput = document.getElementById("hourlyRate").value.trim();
@@ -746,21 +764,24 @@ document.getElementById("businessEstimateButton").style.display = "block";
     const error = document.getElementById("businessError");
     const result = document.getElementById("businessResult");
 
-    if (vehicleCostForEstimate === null || minutesInput === "" ||
-        !Number.isFinite(minutes) || minutes <= 0 ||
+    if ((addMaintenance && (maintenanceInput === "" ||
+        !Number.isFinite(maintenanceRate) || maintenanceRate < 0)) ||
+        (addTravelLabor && (minutesInput === "" || !Number.isFinite(minutes) || minutes <= 0 ||
         passengersInput === "" || !Number.isInteger(passengers) || passengers < 1 ||
-        hourlyInput === "" || !Number.isFinite(hourlyRate) || hourlyRate <= 0 ||
+        hourlyInput === "" || !Number.isFinite(hourlyRate) || hourlyRate <= 0)) ||
         !Number.isFinite(overheadRate) || overheadRate < 0) {
       result.style.display = "none";
-      error.textContent = "片道移動時間・乗車人数・時間単価・諸経費率を確認してください。";
+      error.textContent = "車両維持費・片道移動時間・乗車人数・時間単価・諸経費率を確認してください。";
       error.style.display = "block";
       return;
     }
 
     const multiplier = tripForEstimate === "round" ? 2 : 1;
     const totalMinutes = minutes * multiplier;
-    const laborCost = Math.round(totalMinutes / 60 * passengers * hourlyRate);
-    const baseAmount = vehicleCostForEstimate + laborCost;
+    const maintenanceCost = Number(document.getElementById("distance").value) * multiplier * maintenanceRate;
+    const businessVehicleCost = Math.round(vehicleCostRawForEstimate + maintenanceCost);
+    const laborCost = addTravelLabor ? Math.round(totalMinutes / 60 * passengers * hourlyRate) : 0;
+    const baseAmount = businessVehicleCost + laborCost;
     const overheadCost = Math.round(baseAmount * overheadRate / 100);
     const customerAmount = baseAmount + overheadCost;
     const yen = amount => amount.toLocaleString("ja-JP") + " 円";
@@ -768,12 +789,14 @@ document.getElementById("businessEstimateButton").style.display = "block";
     document.getElementById("businessTotal").textContent =
       customerAmount.toLocaleString("ja-JP") + "円";
     document.getElementById("businessDetail").innerHTML =
-      '<div class="cost-row"><span>車両コスト</span><strong>' + yen(vehicleCostForEstimate) + '</strong></div>' +
-      '<div class="cost-row"><span>移動時間</span><strong>' +
+      '<div class="cost-row"><span>車両交通費</span><strong>' + yen(vehicleCostForEstimate) + '</strong></div>' +
+      (addMaintenance ? '<div class="cost-row"><span>車両維持費</span><strong>' + yen(Math.round(maintenanceCost)) + '</strong></div>' : '') +
+      '<div class="cost-row"><span>車両コスト</span><strong>' + yen(businessVehicleCost) + '</strong></div>' +
+      (addTravelLabor ? '<div class="cost-row"><span>移動時間</span><strong>' +
       minutes.toLocaleString("ja-JP") + ' 分（' + (multiplier === 2 ? '往復 ' : '片道 ') +
       totalMinutes.toLocaleString("ja-JP") + ' 分）</strong></div>' +
       '<div class="cost-row"><span>乗車人数</span><strong>' + passengers + ' 人</strong></div>' +
-      '<div class="cost-row"><span>移動人件費</span><strong>' + yen(laborCost) + '</strong></div>' +
+      '<div class="cost-row"><span>移動人件費</span><strong>' + yen(laborCost) + '</strong></div>' : '') +
       (overheadRate > 0 ? '<div class="cost-row"><span>諸経費（' + overheadRate +
         '%）</span><strong>' + yen(overheadCost) + '</strong></div>' : '') +
       '<div class="cost-row total"><span>客先請求額</span><strong>' + yen(customerAmount) + '</strong></div>';
