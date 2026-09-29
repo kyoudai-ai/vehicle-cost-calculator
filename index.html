@@ -3,16 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KYOUDAI 車両交通費計算</title>
+  <title>KYOUDAI 車両交通費計算 V2テスト</title>
+  <meta name="robots" content="noindex, nofollow">
 
   <style>
     * { box-sizing: border-box; }
 
     body {
       margin: 0;
-    
+
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-        
+
                    "Noto Sans JP", sans-serif;
       background: #f5f6f8;
       color: #222;
@@ -61,13 +62,24 @@
 
     label:first-child { margin-top: 0; }
 
-    input, select {
+    input, select, textarea {
       width: 100%;
       padding: 15px 14px;
       border: 1px solid #ccc;
       border-radius: 10px;
       font-size: 17px;
-      background: white;
+      background: #fff !important;
+      color: #111 !important;
+      color-scheme: light;
+      -webkit-text-fill-color: #111 !important;
+      opacity: 1 !important;
+      caret-color: #111;
+    }
+
+    input::placeholder {
+      color: #888;
+      -webkit-text-fill-color: #888;
+      opacity: 1;
     }
 
     input:focus, select:focus {
@@ -81,6 +93,27 @@
 
     .input-wrap input {
       padding-right: 65px;
+    }
+
+    .maintenance-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 18px 0 7px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .maintenance-toggle input {
+      width: 20px;
+      height: 20px;
+      margin: 0;
+      flex: none;
+    }
+
+    #maintenanceRate:disabled {
+      background: #f1f3f5 !important;
+      opacity: .65 !important;
     }
 
     .unit {
@@ -117,6 +150,17 @@
       line-height: 1.5;
     }
 
+    .route-status {
+      margin: 10px 0 0;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #555;
+    }
+
+    .route-status[aria-invalid="true"] { color: #b00020; }
+
+    #lookupDistance:disabled { opacity: .6; cursor: wait; }
+
     .price-info {
       margin-top: 8px;
       padding: 12px;
@@ -139,10 +183,36 @@
       font-weight: 900;
       cursor: pointer;
     }
-#businessEstimateButton {
-  display: block;
-  margin-top: 14px;
-}
+    .labor-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+
+    .labor-toggle input { width: 20px; height: 20px; margin: 0; flex: none; }
+
+    .business-panel {
+      display: none;
+      margin-top: 20px;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 14px;
+    }
+
+    .business-panel h2 { margin: 0; font-size: 20px; }
+
+    .business-panel details { margin-top: 18px; }
+
+    .business-panel summary { cursor: pointer; font-weight: 800; }
+    .vehicle-panel { display: none; margin-top: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 14px; }
+    .vehicle-panel h2 { margin: 0 0 12px; font-size: 20px; }
+    .vehicle-panel details { margin: 18px 0; }
+    .vehicle-panel summary { cursor: pointer; font-weight: 800; }
+    .vehicle-panel fieldset { border: 0; padding: 0; margin: 0; }
+    .vehicle-panel fieldset label { display: block; margin: 10px 0; }
+    .vehicle-panel input[type="radio"] { width: auto; margin-right: 8px; }
     .result {
       display: none;
       margin-top: 20px;
@@ -171,6 +241,36 @@
       padding-top: 14px;
       font-size: 14px;
       line-height: 1.9;
+    }
+
+    .cost-breakdown {
+      margin-top: 12px;
+      border-top: 1px solid #ddd;
+      padding-top: 12px;
+    }
+
+    .cost-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .cost-row strong { white-space: nowrap; }
+
+    @media (max-width: 480px) {
+      .card { padding: 16px; }
+      .vehicle-panel, .business-panel, .result { padding: 12px; }
+      .price { font-size: clamp(26px, 8vw, 36px); overflow-wrap: anywhere; }
+      .cost-row { flex-wrap: wrap; }
+      .cost-row span { flex: 1 1 110px; min-width: 0; overflow-wrap: anywhere; }
+      .cost-row strong { max-width: 100%; margin-left: auto; white-space: normal; overflow-wrap: anywhere; text-align: right; }
+    }
+
+    .cost-row.total {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #ddd;
+      font-weight: 900;
     }
 
     .error {
@@ -212,8 +312,15 @@
     <input id="destination" type="text"
            placeholder="例：焼津市">
 
+    <button type="button" id="lookupDistance" onclick="lookupDrivingDistance()">
+      車での走行距離を取得
+    </button>
+    <p id="routeStatus" class="route-status" role="status" aria-live="polite">
+      住所を入力して取得してください。距離は手入力・修正もできます。
+    </p>
     <p class="note">
-      ※住所からの距離自動取得は次のアップデートで接続します。
+      経路距離は目安です。実際の道路状況や通行料金は反映されません。<br>
+      住所検索：Nominatim、経路：OSRM、地図データ：© OpenStreetMap contributors
     </p>
 
     <label>片道・往復</label>
@@ -253,9 +360,8 @@
       <option value="diesel">軽油</option>
     </select>
 
-    <div class="price-info">
-      現在は参考価格を手動入力してください。<br>
-      最新価格の自動取得は次のアップデートで接続します。
+    <div id="fuelReferenceInfo" class="price-info" aria-live="polite">
+      全国平均の参考価格（調査日未設定）／実際の給油価格とは異なります。
     </div>
 
     <label for="fuelPrice">燃料価格</label>
@@ -266,7 +372,7 @@
              inputmode="decimal"
              min="0"
              step="0.1"
-             placeholder="例：170">
+             placeholder="価格を入力">
       <span class="unit">円/L</span>
     </div>
 
@@ -281,44 +387,250 @@
              placeholder="例：10">
       <span class="unit">km/L</span>
     </div>
-　　<label for="etcFee">ETC・高速道路料金</label>
-<div class="input-wrap">
-  <input id="etcFee"
-         type="number"
-         inputmode="numeric"
-         min="0"
-         step="1"
-         placeholder="例：1200">
-  <span class="unit">円</span>
-</div>
 
-
-    
-    
+    <label for="etcFee">ETC・高速道路料金</label>
+    <div class="input-wrap">
+      <input id="etcFee" type="number" inputmode="numeric"
+             min="0" step="1" placeholder="例：1200">
+      <span class="unit">円</span>
+    </div>
+    <p class="note">今回の移動分の料金を入力してください。往復の場合も自動で倍にはしません。</p>
 
     <button type="button" onclick="calculateCost()">
       車両交通費を計算する
     </button>
 
     <div id="error" class="error">
-      距離・燃料価格・燃費を入力してください。
+      入力値を確認してください。
     </div>
 
     <div id="result" class="result">
 
       <div class="result-main">
-       <div class="result-title">今回の移動費目安</div> 
+       <div class="result-title">合計車両交通費</div>
         <div id="totalCost" class="price">0円</div>
       </div>
 
      <div id="detail" class="detail"></div>
 
-<button type="button" id="businessEstimateButton">
-  業者向け見積計算へ
-</button> 
+      <button type="button" onclick="openVehiclePanel()">車両維持費も含めて計算する</button>
+      <button type="button" onclick="openBusinessEstimate()">業者向け見積計算へ</button>
     </div>
 
-    
+    <section id="vehiclePanel" class="vehicle-panel" aria-label="車両維持費">
+      <h2>車両維持費を含む実際の移動費</h2>
+      <fieldset>
+        <legend>車の利用方法</legend>
+        <label><input type="radio" name="vehicleUse" value="cash" checked onchange="showVehicleUseFields()">一括購入</label>
+        <label><input type="radio" name="vehicleUse" value="loan" onchange="showVehicleUseFields()">ローン購入</label>
+        <label><input type="radio" name="vehicleUse" value="lease" onchange="showVehicleUseFields()">リース／サブスク</label>
+      </fieldset>
+      <p class="note">一括購入・ローン購入では、購入時の支払総額ではなく車両本体価格を入力してください。税金・保険・登録費用などは含めません。</p>
+      <div id="cashFields" oninput="hideCashResult()" onchange="hideCashResult()">
+        <label for="cashPurchasePrice">車両本体価格（税金・保険・諸費用を除く）</label>
+        <div class="input-wrap"><input id="cashPurchasePrice" type="number" min="0" step="1" placeholder="例：2500000"><span class="unit">円</span></div>
+        <label for="cashUseYears">使用予定年数</label>
+        <div class="input-wrap"><input id="cashUseYears" type="number" min="0.1" step="0.1" placeholder="例：8"><span class="unit">年</span></div>
+        <label for="cashYearlyDistance">年間走行距離</label>
+        <div class="input-wrap"><input id="cashYearlyDistance" type="number" min="1" step="1" placeholder="例：10000"><span class="unit">km/年</span></div>
+        <details>
+          <summary>年間維持費の内訳を入力する</summary>
+          <label for="cashResaleValue">予想売却価格（任意・未入力は0円で概算）</label>
+          <div class="input-wrap"><input id="cashResaleValue" type="number" min="0" step="1" placeholder="金額"><span class="unit">円</span></div>
+          <label for="cashTax">自動車税（重量税は含めない）</label>
+          <div class="input-wrap"><input id="cashTax" type="number" min="0" step="1" placeholder="年間額"><span class="unit">円/年</span></div>
+          <label for="cashInsurance">任意保険料</label>
+          <div class="input-wrap"><input id="cashInsurance" type="number" min="0" step="1" placeholder="支払額"><span class="unit">円</span></div>
+          <label for="cashInsurancePeriod">任意保険の支払周期</label>
+          <select id="cashInsurancePeriod"><option value="">選択してください</option><option value="monthly">月額</option><option value="yearly">年額</option></select>
+          <label for="cashLiability">自賠責保険料（車検費から除く）</label>
+          <div class="input-wrap"><input id="cashLiability" type="number" min="0" step="1" placeholder="支払額"><span class="unit">円/回</span></div>
+          <label for="cashLiabilityYears">自賠責保険の対象期間</label>
+          <div class="input-wrap"><input id="cashLiabilityYears" type="number" min="0.1" step="0.1" placeholder="例：2"><span class="unit">年</span></div>
+          <label for="cashInspection">車検の整備・検査費（自賠責・重量税を除く）</label>
+          <div class="input-wrap"><input id="cashInspection" type="number" min="0" step="1" placeholder="費用のみ"><span class="unit">円/回</span></div>
+          <label for="cashInspectionYears">車検費の支払周期</label>
+          <div class="input-wrap"><input id="cashInspectionYears" type="number" min="0.1" step="0.1" placeholder="例：2"><span class="unit">年ごと</span></div>
+          <label for="cashWeightTax">重量税（自動車税・車検費から除く）</label>
+          <div class="input-wrap"><input id="cashWeightTax" type="number" min="0" step="1" placeholder="支払額"><span class="unit">円/回</span></div>
+          <label for="cashWeightTaxYears">重量税の対象期間</label>
+          <div class="input-wrap"><input id="cashWeightTaxYears" type="number" min="0.1" step="0.1" placeholder="例：2"><span class="unit">年</span></div>
+          <label for="cashTires">タイヤ交換費</label>
+          <div class="input-wrap"><input id="cashTires" type="number" min="0" step="1" placeholder="交換費"><span class="unit">円/回</span></div>
+          <label for="cashTireYears">タイヤ交換周期</label>
+          <div class="input-wrap"><input id="cashTireYears" type="number" min="0.1" step="0.1" placeholder="例：4"><span class="unit">年ごと</span></div>
+          <label for="cashOil">オイル交換費</label>
+          <div class="input-wrap"><input id="cashOil" type="number" min="0" step="1" placeholder="交換費"><span class="unit">円/回</span></div>
+          <label for="cashOilTimes">オイル交換回数</label>
+          <div class="input-wrap"><input id="cashOilTimes" type="number" min="0" step="0.1" placeholder="例：2"><span class="unit">回/年</span></div>
+          <label for="cashRepairs">修理・整備費（上記の車検整備・タイヤ・オイルを除く）</label>
+          <div class="input-wrap"><input id="cashRepairs" type="number" min="0" step="1" placeholder="年間額"><span class="unit">円/年</span></div>
+          <p class="note">車検の領収書は内訳を分けて入力してください。総額しか分からない場合、総額を複数の欄に入力しないでください。未入力の費用は0円として計算し、結果を概算と表示します。</p>
+        </details>
+        <button type="button" onclick="calculateCashCost()">実際の移動費を計算する</button>
+        <div id="cashError" class="error" role="alert"></div>
+        <div id="cashResult" class="result" aria-live="polite">
+          <div class="result-main"><div id="cashResultTitle" class="result-title"></div><div id="cashTotal" class="price"></div></div>
+          <div id="cashBreakdown" class="detail"></div>
+        </div>
+      </div>
+      <div id="loanFields" style="display:none" oninput="updateLoanPrincipal(); hideLoanResult()" onchange="updateLoanPrincipal(); hideLoanResult()">
+        <p class="note">車両本体だけの価格を入力してください。税金・保険・登録費用は含めません。借入額は本体価格から頭金を引いて自動計算します。</p>
+        <label for="loanPurchasePrice">車両本体価格</label>
+        <div class="input-wrap"><input id="loanPurchasePrice" type="number" min="0" step="1" placeholder="例：2500000"><span class="unit">円</span></div>
+        <label for="loanDownPayment">頭金（未入力は0円）</label>
+        <div class="input-wrap"><input id="loanDownPayment" type="number" min="0" step="1" placeholder="例：500000"><span class="unit">円</span></div>
+        <p id="loanPrincipalPreview" class="note" aria-live="polite">借入額：本体価格と頭金を入力すると表示します。</p>
+        <label for="loanUseYears">使用予定年数</label>
+        <div class="input-wrap"><input id="loanUseYears" type="number" min="0.1" step="0.1" placeholder="例：8"><span class="unit">年</span></div>
+        <label for="loanYearlyDistance">年間走行距離</label>
+        <div class="input-wrap"><input id="loanYearlyDistance" type="number" min="1" step="1" placeholder="例：10000"><span class="unit">km/年</span></div>
+        <label for="loanAnnualRate">ローンの年利（実質年率・固定）</label>
+        <div class="input-wrap"><input id="loanAnnualRate" type="number" min="0" step="0.01" placeholder="例：3"><span class="unit">%</span></div>
+        <label for="loanMonths">返済期間（月数）</label>
+        <div class="input-wrap"><input id="loanMonths" type="number" min="1" step="1" placeholder="例：60"><span class="unit">か月</span></div>
+        <details>
+          <summary>年間維持費の内訳を入力する</summary>
+          <label for="loanResaleValue">予想売却価格（任意・未入力は0円で概算）</label>
+          <div class="input-wrap"><input id="loanResaleValue" type="number" min="0" step="1" placeholder="金額"><span class="unit">円</span></div>
+          <label for="loanTax">自動車税（重量税は含めない）</label>
+          <div class="input-wrap"><input id="loanTax" type="number" min="0" step="1" placeholder="年間額"><span class="unit">円/年</span></div>
+          <label for="loanInsurance">任意保険料</label>
+          <div class="input-wrap"><input id="loanInsurance" type="number" min="0" step="1" placeholder="支払額"><span class="unit">円</span></div>
+          <label for="loanInsurancePeriod">任意保険の支払周期</label>
+          <select id="loanInsurancePeriod"><option value="">選択してください</option><option value="monthly">月額</option><option value="yearly">年額</option></select>
+          <label for="loanLiability">自賠責保険料（車検費から除く）</label>
+          <div class="input-wrap"><input id="loanLiability" type="number" min="0" step="1" placeholder="支払額"><span class="unit">円/回</span></div>
+          <label for="loanLiabilityYears">自賠責保険の対象期間</label>
+          <div class="input-wrap"><input id="loanLiabilityYears" type="number" min="0.1" step="0.1" placeholder="例：2"><span class="unit">年</span></div>
+          <label for="loanInspection">車検の整備・検査費（自賠責・重量税を除く）</label>
+          <div class="input-wrap"><input id="loanInspection" type="number" min="0" step="1" placeholder="費用のみ"><span class="unit">円/回</span></div>
+          <label for="loanInspectionYears">車検費の支払周期</label>
+          <div class="input-wrap"><input id="loanInspectionYears" type="number" min="0.1" step="0.1" placeholder="例：2"><span class="unit">年ごと</span></div>
+          <label for="loanWeightTax">重量税（自動車税・車検費から除く）</label>
+          <div class="input-wrap"><input id="loanWeightTax" type="number" min="0" step="1" placeholder="支払額"><span class="unit">円/回</span></div>
+          <label for="loanWeightTaxYears">重量税の対象期間</label>
+          <div class="input-wrap"><input id="loanWeightTaxYears" type="number" min="0.1" step="0.1" placeholder="例：2"><span class="unit">年</span></div>
+          <label for="loanTires">タイヤ交換費</label>
+          <div class="input-wrap"><input id="loanTires" type="number" min="0" step="1" placeholder="交換費"><span class="unit">円/回</span></div>
+          <label for="loanTireYears">タイヤ交換周期</label>
+          <div class="input-wrap"><input id="loanTireYears" type="number" min="0.1" step="0.1" placeholder="例：4"><span class="unit">年ごと</span></div>
+          <label for="loanOil">オイル交換費</label>
+          <div class="input-wrap"><input id="loanOil" type="number" min="0" step="1" placeholder="交換費"><span class="unit">円/回</span></div>
+          <label for="loanOilTimes">オイル交換回数</label>
+          <div class="input-wrap"><input id="loanOilTimes" type="number" min="0" step="0.1" placeholder="例：2"><span class="unit">回/年</span></div>
+          <label for="loanRepairs">修理・整備費（上記の車検整備・タイヤ・オイルを除く）</label>
+          <div class="input-wrap"><input id="loanRepairs" type="number" min="0" step="1" placeholder="年間額"><span class="unit">円/年</span></div>
+          <p class="note">車検の領収書は内訳を分けて入力してください。総額しか分からない場合、総額を複数の欄に入力しないでください。未入力の費用は0円として計算し、結果を概算と表示します。</p>
+        </details>
+        <p class="note">固定金利・毎月同額返済の概算です。ボーナス返済・変動金利・繰上返済・手数料、車両本体以外への借入は対象外です。元金返済額は車両コストに加算しません。維持費は一括購入と同じ内訳で入力してください。</p>
+        <button type="button" onclick="calculateLoanCost()">ローン購入の移動費を計算する</button>
+        <div id="loanError" class="error" role="alert"></div>
+        <div id="loanResult" class="result" aria-live="polite">
+          <div class="result-main"><div id="loanResultTitle" class="result-title"></div><div id="loanTotal" class="price"></div></div>
+          <div id="loanBreakdown" class="detail"></div>
+        </div>
+      </div>
+      <div id="leaseFields" style="display:none" oninput="hideLeaseResult()" onchange="hideLeaseResult()">
+        <p class="note">契約書で月額料金に含まれる費用を確認してください。含まれない費用だけ別途入力します。</p>
+        <label for="leaseMonthlyFee">月額利用料</label>
+        <div class="input-wrap"><input id="leaseMonthlyFee" type="number" min="0" step="1" placeholder="例：50000"><span class="unit">円/月</span></div>
+        <label for="leaseMonths">契約期間</label>
+        <div class="input-wrap"><input id="leaseMonths" type="number" min="1" step="1" placeholder="例：60"><span class="unit">か月</span></div>
+        <label for="leaseYearlyDistance">年間走行距離</label>
+        <div class="input-wrap"><input id="leaseYearlyDistance" type="number" min="1" step="1" placeholder="例：10000"><span class="unit">km/年</span></div>
+        <label for="leaseInitialFee">契約時初期費用（任意・返還されない費用のみ）</label>
+        <div class="input-wrap"><input id="leaseInitialFee" type="number" min="0" step="1" placeholder="未入力は0円"><span class="unit">円/契約</span></div>
+        <label for="leaseBonusFee">ボーナス払い（任意・1回あたり）</label>
+        <div class="input-wrap"><input id="leaseBonusFee" type="number" min="0" step="1" placeholder="未入力は0円"><span class="unit">円/回</span></div>
+        <label for="leaseBonusTimes">ボーナス払いの年間回数</label>
+        <div class="input-wrap"><input id="leaseBonusTimes" type="number" min="0" step="1" placeholder="例：2"><span class="unit">回/年</span></div>
+        <p class="note">初期費用は契約期間で均等に年換算します。ボーナス払いは1回の金額×年間回数で年換算します。月額料金や初期費用に含まれる費用は重ねて入力しないでください。返還される保証金は入力しません。</p>
+        <details id="leaseMaintenanceDetails">
+          <summary>月額料金に含まれる費用を設定する</summary>
+          <p class="note">8項目すべて選んでください。「含まれる」は追加0円、「含まれない」はご自身の負担額と周期を入力します。契約内容が不明な場合は確認してから計算してください。</p>
+          <div id="leaseMaintenanceItems"></div>
+          <p class="note">自動車税と重量税、車検の整備・検査費と自賠責・重量税は分けて入力してください。燃料費とETCは基本移動費にだけ計上します。</p>
+        </details>
+        <button type="button" onclick="calculateLeaseCost()">リース／サブスクの移動費を計算する</button>
+        <div id="leaseError" class="error" role="alert"></div>
+        <div id="leaseResult" class="result" aria-live="polite">
+          <div class="result-main"><div id="leaseResultTitle" class="result-title"></div><div id="leaseTotal" class="price"></div></div>
+          <div id="leaseBreakdown" class="detail"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="businessPanel" class="business-panel" aria-label="業者向け見積計算">
+      <h2>業者向け見積計算</h2>
+      <p class="note">必要な費用だけを選んで、客先請求額を計算できます。</p>
+
+      <label class="maintenance-toggle" for="addMaintenance">
+        <input id="addMaintenance" type="checkbox" onchange="toggleMaintenance()">
+        車両維持費を加算
+      </label>
+      <div id="maintenanceFields" style="display:none">
+        <label for="maintenanceRate">車両維持費</label>
+        <div class="input-wrap">
+          <input id="maintenanceRate" type="number" inputmode="decimal"
+                 min="0" step="0.1" placeholder="例：20" disabled>
+          <span class="unit">円/km</span>
+        </div>
+        <p class="note">片道・往復を反映した走行距離に加算します。</p>
+      </div>
+
+      <label class="labor-toggle" for="addTravelLabor">
+        <input id="addTravelLabor" type="checkbox" onchange="toggleTravelLabor()">
+        移動人件費を加算
+      </label>
+      <div id="travelLaborFields" style="display:none">
+
+      <label for="travelMinutes">車での片道移動時間</label>
+      <div class="input-wrap">
+        <input id="travelMinutes" type="number" inputmode="numeric"
+               min="0" step="1" placeholder="分を入力" oninput="markTimeManual()">
+        <span class="unit">分</span>
+      </div>
+      <p class="note">経路取得時の時間は目安です。取得できない場合も手入力できます。</p>
+
+      <label for="passengers">乗車人数（運転者を含む）</label>
+      <div class="input-wrap">
+        <input id="passengers" type="number" inputmode="numeric"
+               min="1" step="1" value="1">
+        <span class="unit">人</span>
+      </div>
+
+      <label for="hourlyRate">1人あたり時間単価</label>
+      <div class="input-wrap">
+        <input id="hourlyRate" type="number" inputmode="decimal"
+               min="0" step="1" value="4375">
+        <span class="unit">円/時間</span>
+      </div>
+      <p class="note">初期値は1人工35,000円÷8時間です。会社の単価に合わせて変更できます。</p>
+      </div>
+
+      <details>
+        <summary>詳細設定（任意）</summary>
+        <label for="overheadRate">諸経費加算率</label>
+        <div class="input-wrap">
+          <input id="overheadRate" type="number" inputmode="decimal"
+                 min="0" step="0.1" value="0">
+          <span class="unit">%</span>
+        </div>
+      </details>
+
+      <button type="button" onclick="calculateBusinessEstimate()">客先請求額を計算する</button>
+      <div id="businessError" class="error" role="alert"></div>
+      <div id="businessResult" class="result" aria-live="polite">
+        <div class="result-main">
+          <div class="result-title">客先請求額</div>
+          <div id="businessTotal" class="price">0円</div>
+        </div>
+        <div id="businessDetail" class="detail"></div>
+        <p class="note">現場作業の人工代に移動時間を含める場合は、二重計上にご注意ください。</p>
+      </div>
+    </section>
+
   </div>
 
   <footer>
@@ -330,7 +642,201 @@
 <script>
   let tripType = "round";
 
+  let routeRequestId = 0;
+  let timeSource = "manual";
+  let vehicleCostForEstimate = null;
+  let vehicleCostRawForEstimate = null;
+  let tripForEstimate = "round";
+
+  // 入力範囲と表示前の有限値だけを検査する。計算式には介入しない。
+  const numericLimits = {
+    distance: [0, 2000, "片道走行距離", "0kmより大きく2,000km以下"],
+    fuelPrice: [0, 1000, "燃料価格", "0円/Lより大きく1,000円/L以下"],
+    fuelEfficiency: [0, 100, "燃費", "0km/Lより大きく100km/L以下"],
+    etcFee: [0, 100000, "ETC・高速道路料金", "0～100,000円"],
+    PurchasePrice: [0, 100000000, "車両本体価格", "0円より大きく100,000,000円以下"],
+    DownPayment: [0, 100000000, "頭金", "0～100,000,000円"],
+    ResaleValue: [0, 100000000, "予想売却価格", "0～100,000,000円"],
+    UseYears: [0, 30, "使用予定年数", "0年より大きく30年以下"],
+    YearlyDistance: [0, 200000, "年間走行距離", "0kmより大きく200,000km以下"],
+    AnnualRate: [0, 30, "ローン年利", "0～30％"],
+    Months: [1, 360, "返済期間・契約期間", "1～360か月の整数", true],
+    MonthlyFee: [0, 5000000, "月額利用料", "0～5,000,000円/月"],
+    InitialFee: [0, 100000000, "契約時初期費用", "0～100,000,000円"],
+    BonusFee: [0, 5000000, "ボーナス払い", "0～5,000,000円/回"],
+    BonusTimes: [1, 12, "ボーナス払いの年間回数", "1～12回の整数", true],
+    maintenanceAmount: [0, 10000000, "維持費", "0～10,000,000円"],
+    maintenanceYears: [0, 30, "対象期間・交換周期", "0年より大きく30年以下"],
+    maintenanceTimes: [0, 365, "年間交換回数", "0回より大きく365回以下"],
+    maintenanceRate: [0, 10000, "車両維持費", "0～10,000円/km"],
+    travelMinutes: [0, 2880, "片道移動時間", "0分より大きく2,880分以下"],
+    passengers: [1, 100, "乗車人数", "1～100人の整数", true],
+    hourlyRate: [0, 1000000, "時間単価", "0円より大きく1,000,000円/時間以下"],
+    overheadRate: [0, 1000, "諸経費加算率", "0～1,000％"]
+  };
+  const maintenanceNames = { Tax: "自動車税", Insurance: "任意保険", Liability: "自賠責保険",
+    Inspection: "車検整備・検査費", WeightTax: "重量税", Tires: "タイヤ交換費",
+    Oil: "オイル交換費", Repairs: "修理・整備費" };
+  const maintenanceKeys = Object.keys(maintenanceNames);
+  function checkNumericRange(id, rule, optional = false, label = rule[2]) {
+    const raw = document.getElementById(id).value.trim();
+    if (optional && raw === "") return "";
+    const number = Number(raw);
+    const exclusiveZero = rule[0] === 0 && rule[3].includes("より大きく");
+    if (raw === "" || !Number.isFinite(number) || number < rule[0] ||
+        (exclusiveZero && number === 0) || number > rule[1] ||
+        (rule[4] && !Number.isInteger(number))) {
+      return label + "は" + rule[3] + "で入力してください。";
+    }
+    return "";
+  }
+  function checkMaintenanceRange(prefix) {
+    for (const key of maintenanceKeys) {
+      const amountId = prefix + key;
+      const amountError = checkNumericRange(amountId, numericLimits.maintenanceAmount, true,
+        maintenanceNames[key] + "の金額");
+      if (amountError) return amountError;
+      const periodSuffix = { Liability: "LiabilityYears", Inspection: "InspectionYears",
+        WeightTax: "WeightTaxYears", Tires: "TireYears", Oil: "OilTimes" }[key];
+      const periodId = periodSuffix ? prefix + periodSuffix : "";
+      if (periodId) {
+        const rule = key === "Oil" ? numericLimits.maintenanceTimes : numericLimits.maintenanceYears;
+        const periodError = checkNumericRange(periodId, rule, true, maintenanceNames[key] + "の" + rule[2]);
+        if (periodError) return periodError;
+      }
+    }
+    return "";
+  }
+  function finiteNumbers(...values) {
+    return values.every(Number.isFinite);
+  }
+  const nonFiniteMessage = "計算結果が有効な数値になりませんでした。入力値を確認してください。";
+
+  // 全国平均の参考価格。実際の給油価格に応じて入力欄で修正できる。
+  const fuelReferences = {
+    regular: { price: 169.9, surveyDate: "2026-09-14" },
+    highoctane: { price: 180.8, surveyDate: "2026-09-14" },
+    diesel: { price: 159.3, surveyDate: "2026-09-14" }
+  };
+
+  // 公開デモの利用条件に合わせ、住所検索はボタン操作時だけ行う。
+  const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  async function getJson(url, signal, stage) {
+    try {
+      const response = await fetch(url, { signal });
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return await response.json();
+    } catch (error) {
+      if (error.name === "AbortError") {
+        error.stage = stage;
+        throw error;
+      }
+      throw new Error(stage + "で通信に失敗しました（" + error.message + "）");
+    }
+  }
+
+  async function geocodeAddress(address, signal, stage) {
+    const query = /日本|Japan/i.test(address) ? address : address + ", 日本";
+    const url = "https://nominatim.openstreetmap.org/search?" +
+      new URLSearchParams({ q: query, format: "json", limit: "1", countrycodes: "jp" });
+    const results = await getJson(url, signal, stage);
+    const point = results[0];
+    if (!point || !Number.isFinite(Number(point.lon)) || !Number.isFinite(Number(point.lat))) {
+      throw new Error("住所が見つかりませんでした");
+    }
+    return [Number(point.lon), Number(point.lat)];
+  }
+
+  async function lookupDrivingDistance() {
+    const start = document.getElementById("start").value.trim();
+    const destination = document.getElementById("destination").value.trim();
+    const distance = document.getElementById("distance");
+    const travelMinutes = document.getElementById("travelMinutes");
+    const status = document.getElementById("routeStatus");
+    const button = document.getElementById("lookupDistance");
+
+    if (!start || !destination) {
+      status.textContent = "出発地と目的地の両方を入力してください。距離は手入力もできます。";
+      status.setAttribute("aria-invalid", "true");
+      return;
+    }
+
+    const requestId = ++routeRequestId;
+    const previousDistance = distance.value;
+    const previousTime = travelMinutes.value;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    button.disabled = true;
+    status.removeAttribute("aria-invalid");
+    status.textContent = "車での走行距離を調べています…";
+
+    try {
+      const origin = await geocodeAddress(start, controller.signal, "出発地の住所検索（Nominatim）");
+      // Nominatim の公開サービスは最大 1 リクエスト/秒。
+      await pause(1100);
+      const target = await geocodeAddress(destination, controller.signal, "目的地の住所検索（Nominatim）");
+      const coordinates = [origin, target].map(point => point.join(",")).join(";");
+      const url = "https://router.project-osrm.org/route/v1/driving/" +
+        coordinates + "?overview=false";
+      const route = await getJson(url, controller.signal, "車の経路取得（OSRM）");
+      const meters = route.routes?.[0]?.distance;
+      const seconds = route.routes?.[0]?.duration;
+      if (route.code !== "Ok" || !Number.isFinite(meters) || meters <= 0) {
+        throw new Error("車で通れる経路が見つかりませんでした");
+      }
+      // 検索中に住所や距離が変更された場合は、入力済みの値を上書きしない。
+      if (requestId !== routeRequestId || distance.value !== previousDistance ||
+          start !== document.getElementById("start").value.trim() ||
+          destination !== document.getElementById("destination").value.trim()) {
+        status.textContent = "入力が変更されたため、取得結果は反映していません。";
+        return;
+      }
+      distance.value = (meters / 1000).toFixed(1);
+      // プログラムによる値の反映では input/change イベントが発火しない。
+      // 同じ距離に丸められた場合も、取得済み経路に対する再計算を利用者に委ねる。
+      invalidateBasicResults();
+      if (Number.isFinite(seconds) && seconds > 0 && travelMinutes.value === previousTime) {
+        travelMinutes.value = String(Math.max(1, Math.round(seconds / 60)));
+        timeSource = "auto";
+        status.textContent = "片道の走行距離と移動時間を反映しました。どちらも修正できます。";
+      } else {
+        if (timeSource === "auto" && travelMinutes.value === previousTime) {
+          travelMinutes.value = "";
+          timeSource = "manual";
+        }
+        status.textContent = "片道の走行距離を反映しました。移動時間は業者向け画面で確認・手入力できます。";
+      }
+    } catch (error) {
+      if (timeSource === "auto" && travelMinutes.value === previousTime) {
+        travelMinutes.value = "";
+        timeSource = "manual";
+      }
+      status.setAttribute("aria-invalid", "true");
+      status.textContent = (error.name === "AbortError"
+        ? error.stage + "が時間切れになりました。"
+        : error.message) + " 距離と移動時間を手入力して計算できます。";
+    } finally {
+      clearTimeout(timeout);
+      if (requestId === routeRequestId) button.disabled = false;
+    }
+  }
+
+  function markTimeManual() {
+    timeSource = "manual";
+  }
+
+  // 基本条件が変わったら表示済みの結果だけを破棄する。入力値は保持する。
+  function invalidateBasicResults() {
+    vehicleCostForEstimate = null;
+    vehicleCostRawForEstimate = null;
+    ["result", "cashResult", "loanResult", "leaseResult", "businessResult",
+      "error", "cashError", "loanError", "leaseError", "businessError"]
+      .forEach(id => { document.getElementById(id).style.display = "none"; });
+  }
+
   function setTrip(type) {
+    if (tripType !== type) invalidateBasicResults();
     tripType = type;
 
     const oneWay = document.getElementById("oneWay");
@@ -346,23 +852,53 @@
   }
 
   function changeFuel() {
+    invalidateBasicResults();
     const type = document.getElementById("fuelType").value;
     const price = document.getElementById("fuelPrice");
+    const info = document.getElementById("fuelReferenceInfo");
+    const reference = fuelReferences[type];
+    const validDate = reference && typeof reference.surveyDate === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(reference.surveyDate) &&
+      !Number.isNaN(Date.parse(reference.surveyDate)) &&
+      new Date(reference.surveyDate).toISOString().slice(0, 10) === reference.surveyDate;
+    const validPrice = reference && typeof reference.price === "number" &&
+      Number.isFinite(reference.price) && reference.price > 0;
 
-    if (type === "regular") {
-      price.placeholder = "例：170";
-    }
-
-    if (type === "highoctane") {
-      price.placeholder = "例：181";
-    }
-
-    if (type === "diesel") {
-      price.placeholder = "例：158";
+    if (validDate && validPrice) {
+      price.value = String(reference.price);
+      const [year, month, day] = reference.surveyDate.split("-");
+      info.textContent = "全国平均の参考価格（調査日 " +
+        year + "/" + Number(month) + "/" + Number(day) +
+        "）／実際の給油価格とは異なります";
+    } else {
+      // 油種を切り替えた際、別の油種の価格を使い続けない。
+      price.value = "";
+      info.textContent = "全国平均の参考価格（調査日未設定）／" +
+        "実際の給油価格とは異なります。燃料価格を手入力してください。";
     }
   }
 
+  function toggleMaintenance() {
+    const enabled = document.getElementById("addMaintenance").checked;
+    document.getElementById("maintenanceRate").disabled = !enabled;
+    document.getElementById("maintenanceFields").style.display = enabled ? "block" : "none";
+    document.getElementById("businessResult").style.display = "none";
+  }
+
   function calculateCost() {
+
+    const rangeError = ["distance", "fuelPrice", "fuelEfficiency", "etcFee"]
+      .map(id => checkNumericRange(id, numericLimits[id], id === "etcFee")).find(Boolean);
+    if (rangeError) {
+      vehicleCostForEstimate = null;
+      vehicleCostRawForEstimate = null;
+      document.getElementById("businessPanel").style.display = "none";
+      document.getElementById("result").style.display = "none";
+      const error = document.getElementById("error");
+      error.textContent = rangeError;
+      error.style.display = "block";
+      return;
+    }
 
     const oneWayDistance =
       Number(document.getElementById("distance").value);
@@ -372,24 +908,27 @@
 
     const fuelEfficiency =
       Number(document.getElementById("fuelEfficiency").value);
-　　const etcFee =
-  Number(document.getElementById("etcFee").value) || 0;
-
-
+    const etcInput = document.getElementById("etcFee").value.trim();
+    const etcFee = etcInput === "" ? 0 : Number(etcInput);
     const error =
       document.getElementById("error");
 
     const result =
       document.getElementById("result");
 
-    
+
 
     if (
-      oneWayDistance <= 0 ||
-      fuelPrice <= 0 ||
-      fuelEfficiency <= 0
+      !Number.isFinite(oneWayDistance) || oneWayDistance <= 0 ||
+      !Number.isFinite(fuelPrice) || fuelPrice <= 0 ||
+      !Number.isFinite(fuelEfficiency) || fuelEfficiency <= 0 ||
+      !Number.isFinite(etcFee) || etcFee < 0
     ) {
+      vehicleCostForEstimate = null;
+      vehicleCostRawForEstimate = null;
+      document.getElementById("businessPanel").style.display = "none";
       result.style.display = "none";
+      error.textContent = "距離・燃料価格・燃費・料金の入力値を確認してください。";
       error.style.display = "block";
       return;
     }
@@ -404,10 +943,22 @@
 
     const fuelCost =
       liters * fuelPrice;
-　　const totalCost =
-  fuelCost + etcFee;
+    const totalCost = fuelCost + etcFee;
+    vehicleCostForEstimate = Math.round(totalCost);
+    vehicleCostRawForEstimate = totalCost;
+    tripForEstimate = tripType;
+    document.getElementById("businessResult").style.display = "none";
     const costPerKm =
       fuelPrice / fuelEfficiency;
+    if (!finiteNumbers(totalDistance, liters, fuelCost, totalCost, costPerKm)) {
+      vehicleCostForEstimate = null;
+      vehicleCostRawForEstimate = null;
+      document.getElementById("businessPanel").style.display = "none";
+      result.style.display = "none";
+      error.textContent = nonFiniteMessage;
+      error.style.display = "block";
+      return;
+    }
 
     const fuelType =
       document.getElementById("fuelType");
@@ -427,14 +978,565 @@
       "燃料単価：" +
       fuelPrice.toLocaleString("ja-JP") + " 円/L<br>" +
       "1kmあたり燃料費：約 " +
-      costPerKm.toFixed(1) + " 円/km<br>" +
-"ETC・高速道路料金：" + etcFee.toLocaleString("ja-JP") + " 円";
+      costPerKm.toFixed(1) + " 円/km" +
+      '<div class="cost-breakdown">' +
+      '<div class="cost-row"><span>燃料費</span><strong>' +
+      fuelCost.toLocaleString("ja-JP", { maximumFractionDigits: 2 }) + ' 円</strong></div>' +
+      '<div class="cost-row"><span>ETC・高速道路料金</span><strong>' +
+      etcFee.toLocaleString("ja-JP", { maximumFractionDigits: 2 }) + ' 円</strong></div>' +
+      '<div class="cost-row total"><span>合計車両交通費</span><strong>' +
+      totalCost.toLocaleString("ja-JP", { maximumFractionDigits: 2 }) + ' 円</strong></div></div>' +
+      '<p class="note">合計の大きな表示は円単位に四捨五入しています。明細は小数第2位まで表示します。</p>';
 
 
     error.style.display = "none";
     result.style.display = "block";
-document.getElementById("businessEstimateButton").style.display = "block";
- }   
+ }
+
+  function openVehiclePanel() {
+    const panel = document.getElementById("vehiclePanel");
+    panel.style.display = "block";
+    panel.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }
+
+  function showVehicleUseFields() {
+    const selected = document.querySelector('input[name="vehicleUse"]:checked').value;
+    document.getElementById("cashFields").style.display = selected === "cash" ? "block" : "none";
+    document.getElementById("loanFields").style.display = selected === "loan" ? "block" : "none";
+    document.getElementById("leaseFields").style.display = selected === "lease" ? "block" : "none";
+    hideCashResult();
+    hideLoanResult();
+    hideLeaseResult();
+  }
+
+  function hideLoanResult() {
+    document.getElementById("loanResult").style.display = "none";
+    document.getElementById("loanError").style.display = "none";
+  }
+
+  function updateLoanPrincipal() {
+    const price = document.getElementById("loanPurchasePrice").value.trim();
+    const down = document.getElementById("loanDownPayment").value.trim();
+    const preview = document.getElementById("loanPrincipalPreview");
+    const principal = Number(price) - Number(down || 0);
+    preview.textContent = price !== "" && Number.isFinite(principal) && Number(price) > 0 &&
+      Number(down || 0) >= 0 && principal >= 0
+      ? "借入額（本体価格－頭金）：" + principal.toLocaleString("ja-JP") + "円"
+      : "借入額：車両本体価格と頭金を確認してください。";
+  }
+
+  function hideCashResult() {
+    document.getElementById("cashResult").style.display = "none";
+    document.getElementById("cashError").style.display = "none";
+  }
+
+  // 項目ごとに年間額へ換算する。燃料費とETCは基本移動費にだけ含める。
+  function computeCashCosts(v) {
+    const annualVehicleBase = (v.purchase - v.resale) / v.years;
+    const annualItems = {
+      tax: v.tax,
+      insurance: v.insurance * (v.insurancePeriod === "monthly" ? 12 : 1),
+      liability: v.liability / (v.liabilityYears || 1),
+      inspection: v.inspection / (v.inspectionYears || 1),
+      weightTax: v.weightTax / (v.weightTaxYears || 1),
+      tires: v.tires / (v.tireYears || 1),
+      oil: v.oil * v.oilTimes,
+      repairs: v.repairs
+    };
+    const annualMaintenance = Object.values(annualItems).reduce((sum, amount) => sum + amount, 0);
+    const annualTotal = annualVehicleBase + annualMaintenance;
+    const perKm = annualTotal / v.annualDistance;
+    const tripVehicleCost = perKm * v.tripDistance;
+    return { annualVehicleBase, annualItems, annualMaintenance, annualTotal, perKm,
+      tripVehicleCost, total: v.basicCost + tripVehicleCost };
+  }
+
+  function calculateCashCost() {
+    hideCashResult();
+    const get = id => document.getElementById(id).value.trim();
+    const fields = {
+      purchase: "cashPurchasePrice", resale: "cashResaleValue", years: "cashUseYears",
+      annualDistance: "cashYearlyDistance", tax: "cashTax", insurance: "cashInsurance",
+      liability: "cashLiability", liabilityYears: "cashLiabilityYears",
+      inspection: "cashInspection", inspectionYears: "cashInspectionYears",
+      weightTax: "cashWeightTax", weightTaxYears: "cashWeightTaxYears",
+      tires: "cashTires", tireYears: "cashTireYears", oil: "cashOil",
+      oilTimes: "cashOilTimes", repairs: "cashRepairs"
+    };
+    const raw = Object.fromEntries(Object.entries(fields).map(([key, id]) => [key, get(id)]));
+    const values = Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, value === "" ? 0 : Number(value)]));
+    const periods = [["liability", "liabilityYears"], ["inspection", "inspectionYears"],
+      ["weightTax", "weightTaxYears"], ["tires", "tireYears"], ["oil", "oilTimes"]];
+    const invalidPeriod = periods.some(([amount, period]) =>
+      (raw[amount] !== "" && (raw[period] === "" || values[period] <= 0)) ||
+      (raw[period] !== "" && raw[amount] === ""));
+    const error = document.getElementById("cashError");
+    const cashRangeError = [
+      ["cashPurchasePrice", numericLimits.PurchasePrice, false],
+      ["cashUseYears", numericLimits.UseYears, false],
+      ["cashYearlyDistance", numericLimits.YearlyDistance, false],
+      ["cashResaleValue", numericLimits.ResaleValue, true]
+    ].map(([id, rule, optional]) => checkNumericRange(id, rule, optional)).find(Boolean) ||
+      checkMaintenanceRange("cash");
+    if (cashRangeError) {
+      error.textContent = cashRangeError;
+      error.style.display = "block";
+      return;
+    }
+    if (raw.purchase === "" || values.purchase <= 0 || raw.years === "" || values.years <= 0 ||
+        raw.annualDistance === "" || values.annualDistance <= 0 ||
+        values.resale > values.purchase ||
+        Object.values(values).some(value => !Number.isFinite(value) || value < 0) ||
+        (raw.insurance !== "" && !get("cashInsurancePeriod")) ||
+        (raw.insurance === "" && get("cashInsurancePeriod") !== "") || invalidPeriod) {
+      error.textContent = "車両本体価格・使用年数・年間走行距離と、入力した費用の支払周期を確認してください。";
+      error.style.display = "block";
+      return;
+    }
+
+    calculateCost();
+    if (vehicleCostRawForEstimate === null) {
+      error.textContent = "先に距離・燃料価格・燃費・ETCの入力を確認してください。";
+      error.style.display = "block";
+      return;
+    }
+    const optionalCosts = ["tax", "insurance", "liability", "inspection", "weightTax", "tires", "oil", "repairs"];
+    const estimated = raw.resale === "" || optionalCosts.some(key => raw[key] === "");
+    const costs = computeCashCosts({ ...values, insurancePeriod: get("cashInsurancePeriod"),
+      tripDistance: Number(document.getElementById("distance").value) *
+        (tripForEstimate === "round" ? 2 : 1), basicCost: vehicleCostRawForEstimate });
+    if (!finiteNumbers(costs.annualVehicleBase, ...Object.values(costs.annualItems),
+        costs.annualMaintenance, costs.annualTotal, costs.perKm, costs.tripVehicleCost,
+        costs.total, vehicleCostRawForEstimate)) {
+      error.textContent = nonFiniteMessage;
+      error.style.display = "block";
+      return;
+    }
+    const yen = value => value.toLocaleString("ja-JP", { maximumFractionDigits: 2 }) + "円";
+    const names = { tax: "自動車税", insurance: "任意保険", liability: "自賠責保険",
+      inspection: "車検の整備・検査費", weightTax: "重量税", tires: "タイヤ",
+      oil: "オイル", repairs: "修理・整備費" };
+    const row = (label, value) => '<div class="cost-row"><span>' + label +
+      '</span><strong>' + yen(value) + '</strong></div>';
+    document.getElementById("cashResultTitle").textContent =
+      estimated ? "今回の実際の移動費（概算）" : "今回の実際の移動費";
+    document.getElementById("cashTotal").textContent =
+      Math.round(costs.total).toLocaleString("ja-JP") + "円";
+    document.getElementById("cashBreakdown").innerHTML =
+      '<div class="cost-row"><span>使用予定年数</span><strong>' + values.years + ' 年</strong></div>' +
+      '<div class="cost-row"><span>年間走行距離</span><strong>' + values.annualDistance.toLocaleString("ja-JP") + ' km/年</strong></div>' +
+      row("基本移動費（燃料費・ETC）", vehicleCostRawForEstimate) +
+      row("車両本体の年間負担額", costs.annualVehicleBase) +
+      Object.entries(costs.annualItems).map(([key, value]) => row(names[key] + "（年間）", value)).join("") +
+      row("年間維持費の合計", costs.annualMaintenance) +
+      row("年間車両コスト", costs.annualTotal) +
+      row("1km当たり車両コスト", costs.perKm).replace("円</strong>", "円/km</strong>") +
+      row("今回の車両コスト分", costs.tripVehicleCost) +
+      '<div class="cost-row total"><span>今回の実際の移動費</span><strong>' + yen(costs.total) + '</strong></div>' +
+      (estimated ? '<p class="note">未入力の項目は0円として計算した概算です。</p>' : '') +
+      '<p class="note">金額の明細は小数第2位まで、上の合計は内部計算値を円単位に四捨五入して表示します。</p>';
+    document.getElementById("cashResult").style.display = "block";
+  }
+
+  // 元金返済は費用に加えない。使用予定期間内に発生する各月の利息だけを集計する。
+  function computeLoanInterest(principal, annualRate, months, useYears) {
+    if (principal === 0) return { monthlyPayment: 0, interestDuringUse: 0 };
+    const rate = annualRate / 100 / 12;
+    const monthlyPayment = rate === 0 ? principal / months :
+      principal * rate / (1 - Math.pow(1 + rate, -months));
+    let balance = principal;
+    let interestDuringUse = 0;
+    const countedMonths = Math.min(months, useYears * 12);
+    for (let month = 0; month < Math.ceil(countedMonths); month++) {
+      const interest = balance * rate;
+      interestDuringUse += interest * Math.min(1, countedMonths - month);
+      balance = Math.max(0, balance - (monthlyPayment - interest));
+    }
+    return { monthlyPayment, interestDuringUse };
+  }
+
+  function calculateLoanCost() {
+    hideLoanResult();
+    const get = id => document.getElementById(id).value.trim();
+    const keys = ["PurchasePrice", "DownPayment", "UseYears", "YearlyDistance", "AnnualRate", "Months",
+      "ResaleValue", "Tax", "Insurance", "Liability", "LiabilityYears", "Inspection",
+      "InspectionYears", "WeightTax", "WeightTaxYears", "Tires", "TireYears",
+      "Oil", "OilTimes", "Repairs"];
+    const raw = Object.fromEntries(keys.map(key => [key, get("loan" + key)]));
+    const n = key => raw[key] === "" ? 0 : Number(raw[key]);
+    const error = document.getElementById("loanError");
+    const loanRangeError = [
+      ["PurchasePrice", numericLimits.PurchasePrice, false],
+      ["DownPayment", numericLimits.DownPayment, true],
+      ["ResaleValue", numericLimits.ResaleValue, true],
+      ["UseYears", numericLimits.UseYears, false],
+      ["YearlyDistance", numericLimits.YearlyDistance, false],
+      ["AnnualRate", numericLimits.AnnualRate, false],
+      ["Months", numericLimits.Months, false]
+    ].map(([key, rule, optional]) => checkNumericRange("loan" + key, rule, optional,
+      key === "Months" ? "ローン返済期間" : rule[2])).find(Boolean) ||
+      checkMaintenanceRange("loan");
+    if (loanRangeError) {
+      error.textContent = loanRangeError;
+      error.style.display = "block";
+      return;
+    }
+    const pairs = [["Liability", "LiabilityYears"], ["Inspection", "InspectionYears"],
+      ["WeightTax", "WeightTaxYears"], ["Tires", "TireYears"], ["Oil", "OilTimes"]];
+    const invalidPair = pairs.some(([amount, period]) =>
+      (raw[amount] !== "" && (raw[period] === "" || n(period) <= 0)) ||
+      (raw[period] !== "" && raw[amount] === ""));
+    if (["PurchasePrice", "UseYears", "YearlyDistance", "AnnualRate", "Months"].some(key => raw[key] === "") ||
+        n("PurchasePrice") <= 0 || n("UseYears") <= 0 || n("YearlyDistance") <= 0 ||
+        !Number.isInteger(n("Months")) || n("Months") <= 0 ||
+        Object.keys(raw).some(key => !Number.isFinite(n(key)) || n(key) < 0) ||
+        n("DownPayment") > n("PurchasePrice") || n("ResaleValue") > n("PurchasePrice") ||
+        (raw.Insurance !== "" && !get("loanInsurancePeriod")) ||
+        (raw.Insurance === "" && get("loanInsurancePeriod") !== "") || invalidPair) {
+      error.textContent = "本体価格・頭金・使用年数・年間走行距離・年利・返済月数と、維持費の支払周期を確認してください。";
+      error.style.display = "block";
+      return;
+    }
+    calculateCost();
+    if (vehicleCostRawForEstimate === null) {
+      error.textContent = "先に距離・燃料価格・燃費・ETCの入力を確認してください。";
+      error.style.display = "block";
+      return;
+    }
+    const principal = n("PurchasePrice") - n("DownPayment");
+    const loan = computeLoanInterest(principal, n("AnnualRate"), n("Months"), n("UseYears"));
+    const tripDistance = Number(document.getElementById("distance").value) *
+      (tripForEstimate === "round" ? 2 : 1);
+    const base = computeCashCosts({ purchase: n("PurchasePrice"), resale: n("ResaleValue"),
+      years: n("UseYears"), annualDistance: n("YearlyDistance"),
+      tax: n("Tax"), insurance: n("Insurance"), insurancePeriod: get("loanInsurancePeriod"),
+      liability: n("Liability"), liabilityYears: n("LiabilityYears"),
+      inspection: n("Inspection"), inspectionYears: n("InspectionYears"),
+      weightTax: n("WeightTax"), weightTaxYears: n("WeightTaxYears"),
+      tires: n("Tires"), tireYears: n("TireYears"), oil: n("Oil"),
+      oilTimes: n("OilTimes"), repairs: n("Repairs"),
+      tripDistance, basicCost: vehicleCostRawForEstimate });
+    const annualInterest = loan.interestDuringUse / n("UseYears");
+    const annualTotal = base.annualTotal + annualInterest;
+    const perKm = annualTotal / n("YearlyDistance");
+    const tripVehicleCost = perKm * tripDistance;
+    const total = vehicleCostRawForEstimate + tripVehicleCost;
+    if (!finiteNumbers(principal, loan.monthlyPayment, loan.interestDuringUse,
+        base.annualVehicleBase, ...Object.values(base.annualItems), base.annualMaintenance,
+        base.annualTotal, base.perKm, base.tripVehicleCost, base.total, annualInterest,
+        annualTotal, perKm, tripVehicleCost, total, vehicleCostRawForEstimate)) {
+      error.textContent = nonFiniteMessage;
+      error.style.display = "block";
+      return;
+    }
+    const estimated = raw.ResaleValue === "" ||
+      ["Tax", "Insurance", "Liability", "Inspection", "WeightTax", "Tires", "Oil", "Repairs"]
+        .some(key => raw[key] === "");
+    const yen = value => value.toLocaleString("ja-JP", { maximumFractionDigits: 2 }) + "円";
+    const row = (label, value) => '<div class="cost-row"><span>' + label +
+      '</span><strong>' + yen(value) + '</strong></div>';
+    document.getElementById("loanResultTitle").textContent =
+      estimated ? "今回の実際の移動費（概算）" : "今回の実際の移動費";
+    document.getElementById("loanTotal").textContent =
+      Math.round(total).toLocaleString("ja-JP") + "円";
+    document.getElementById("loanBreakdown").innerHTML =
+      '<div class="cost-row"><span>使用予定年数</span><strong>' + n("UseYears") + ' 年</strong></div>' +
+      '<div class="cost-row"><span>年間走行距離</span><strong>' + n("YearlyDistance").toLocaleString("ja-JP") + ' km/年</strong></div>' +
+      '<div class="cost-row"><span>ローン年利</span><strong>' + n("AnnualRate") + ' %</strong></div>' +
+      '<div class="cost-row"><span>返済期間</span><strong>' + n("Months") + ' か月</strong></div>' +
+      row("借入額（本体価格－頭金・元金）", principal) +
+      row("毎月返済額（参考・元金を再加算しない）", loan.monthlyPayment) +
+      row("車両本体の年間負担額", base.annualVehicleBase) +
+      row("使用予定期間中の利息合計", loan.interestDuringUse) +
+      row("年間の金利負担額", annualInterest) +
+      row("年間維持費", base.annualMaintenance) +
+      row("年間車両コスト", annualTotal) +
+      row("1km当たり車両コスト", perKm).replace("円</strong>", "円/km</strong>") +
+      row("今回の車両コスト分", tripVehicleCost) +
+      row("基本移動費（燃料費・ETC）", vehicleCostRawForEstimate) +
+      '<div class="cost-row total"><span>今回の実際の移動費</span><strong>' + yen(total) + '</strong></div>' +
+      (estimated ? '<p class="note">未入力の売却価格・維持費は0円として計算した概算です。</p>' : '') +
+      '<p class="note">元金返済額を年間車両コストに重複加算していません。契約の返済予定表と異なる場合は実際の利息をご確認ください。</p>' +
+      '<p class="note">金額の明細は小数第2位まで、上の合計は内部計算値を円単位に四捨五入して表示します。</p>';
+    document.getElementById("loanResult").style.display = "block";
+  }
+
+  // リース専用。契約の対象となる8項目を明示してから、含まれない項目だけを加算する。
+  const leaseItems = [
+    { key: "Tax", label: "自動車税（重量税を除く）", period: "yearly" },
+    { key: "Insurance", label: "任意保険", period: "select" },
+    { key: "Liability", label: "自賠責保険（車検費から除く）", period: "years" },
+    { key: "Inspection", label: "車検整備・検査費（自賠責・重量税を除く）", period: "years" },
+    { key: "WeightTax", label: "重量税（自動車税・車検費から除く）", period: "years" },
+    { key: "Tires", label: "タイヤ交換費", period: "years" },
+    { key: "Oil", label: "オイル交換費", period: "times" },
+    { key: "Repairs", label: "修理／メンテナンス費（上記の車検・タイヤ・オイルを除く）", period: "yearly" }
+  ];
+
+  function setupLeaseItems() {
+    const root = document.getElementById("leaseMaintenanceItems");
+    root.innerHTML = leaseItems.map(item => {
+      const prefix = "lease" + item.key;
+      let period = "";
+      if (item.period === "select") period = '<label for="' + prefix + 'Period">支払周期</label>' +
+        '<select id="' + prefix + 'Period"><option value="">選択してください</option>' +
+        '<option value="monthly">月額</option><option value="yearly">年額</option></select>';
+      if (item.period === "years") period = '<label for="' + prefix + 'Years">対象期間・交換周期</label>' +
+        '<div class="input-wrap"><input id="' + prefix + 'Years" type="number" min="0.1" step="0.1" placeholder="例：2"><span class="unit">年ごと</span></div>';
+      if (item.period === "times") period = '<label for="' + prefix + 'Times">年間交換回数</label>' +
+        '<div class="input-wrap"><input id="' + prefix + 'Times" type="number" min="0" step="0.1" placeholder="例：2"><span class="unit">回/年</span></div>';
+      return '<div class="lease-item"><label for="' + prefix + 'Status">' + item.label + '</label>' +
+        '<select id="' + prefix + 'Status" onchange="toggleLeaseItem(\'' + item.key + '\')">' +
+        '<option value="">選択してください</option><option value="included">月額料金に含まれる</option>' +
+        '<option value="excluded">月額料金に含まれない</option></select>' +
+        '<div id="' + prefix + 'Inputs" style="display:none">' +
+        '<label for="' + prefix + 'Amount">別途支払う金額</label>' +
+        '<div class="input-wrap"><input id="' + prefix + 'Amount" type="number" min="0" step="1" placeholder="金額を入力"><span class="unit">円' +
+        (item.period === "yearly" ? '/年' : '/回') + '</span></div>' + period + '</div></div>';
+    }).join("");
+  }
+
+  function toggleLeaseItem(key) {
+    const prefix = "lease" + key;
+    const excluded = document.getElementById(prefix + "Status").value === "excluded";
+    document.getElementById(prefix + "Inputs").style.display = excluded ? "block" : "none";
+    document.querySelectorAll('#' + prefix + 'Inputs input, #' + prefix + 'Inputs select')
+      .forEach(field => { field.disabled = !excluded; });
+    hideLeaseResult();
+  }
+
+  function hideLeaseResult() {
+    document.getElementById("leaseResult").style.display = "none";
+    document.getElementById("leaseError").style.display = "none";
+  }
+
+  function calculateLeaseCost() {
+    hideLeaseResult();
+    const get = id => document.getElementById(id).value.trim();
+    const numeric = id => Number(get(id));
+    const error = document.getElementById("leaseError");
+    const fail = message => { error.textContent = message; error.style.display = "block"; };
+    const leaseRangeError = [
+      ["leaseMonthlyFee", numericLimits.MonthlyFee, false],
+      ["leaseMonths", numericLimits.Months, false, "リース契約期間"],
+      ["leaseYearlyDistance", numericLimits.YearlyDistance, false],
+      ["leaseInitialFee", numericLimits.InitialFee, true],
+      ["leaseBonusFee", numericLimits.BonusFee, true],
+      ["leaseBonusTimes", numericLimits.BonusTimes, true]
+    ].map(([id, rule, optional, label]) => checkNumericRange(id, rule, optional, label || rule[2]))
+      .find(Boolean);
+    if (leaseRangeError) { fail(leaseRangeError); return; }
+    const required = ["leaseMonthlyFee", "leaseMonths", "leaseYearlyDistance"];
+    if (required.some(id => get(id) === "" || !Number.isFinite(numeric(id))) ||
+        numeric("leaseMonthlyFee") < 0 || numeric("leaseMonths") <= 0 ||
+        !Number.isInteger(numeric("leaseMonths")) || numeric("leaseYearlyDistance") <= 0) {
+      fail("月額利用料・契約期間（正の整数か月）・年間走行距離（0より大きい値）を入力してください。");
+      return;
+    }
+    const initial = get("leaseInitialFee") === "" ? 0 : numeric("leaseInitialFee");
+    const bonus = get("leaseBonusFee") === "" ? 0 : numeric("leaseBonusFee");
+    const bonusTimes = get("leaseBonusTimes") === "" ? 0 : numeric("leaseBonusTimes");
+    if (![initial, bonus, bonusTimes].every(v => Number.isFinite(v) && v >= 0) ||
+        !Number.isInteger(bonusTimes) ||
+        (get("leaseBonusFee") !== "" && (get("leaseBonusTimes") === "" || bonusTimes <= 0)) ||
+        (get("leaseBonusTimes") !== "" && get("leaseBonusFee") === "")) {
+      fail("初期費用・ボーナス払いを確認してください。ボーナス払いは1回の金額と年間回数をセットで入力してください。");
+      return;
+    }
+    const annualItems = {};
+    for (const item of leaseItems) {
+      const prefix = "lease" + item.key;
+      const status = get(prefix + "Status");
+      if (status !== "included" && status !== "excluded") {
+        document.getElementById("leaseMaintenanceDetails").open = true;
+        fail("月額料金に含まれる費用を8項目すべて選択してください。");
+        return;
+      }
+      if (status === "included") { annualItems[item.key] = 0; continue; }
+      const amountRaw = get(prefix + "Amount");
+      const amount = numeric(prefix + "Amount");
+      const amountRangeError = checkNumericRange(prefix + "Amount", numericLimits.maintenanceAmount,
+        false, item.label + "の別途支払額");
+      if (amountRangeError) {
+        document.getElementById("leaseMaintenanceDetails").open = true;
+        fail(amountRangeError); return;
+      }
+      if (amountRaw === "" || !Number.isFinite(amount) || amount < 0) {
+        document.getElementById("leaseMaintenanceDetails").open = true;
+        fail(item.label + "の別途支払額を入力してください（支払額が0円なら0を入力）。");
+        return;
+      }
+      let factor = 1;
+      if (item.period === "select") {
+        const period = get(prefix + "Period");
+        if (period !== "monthly" && period !== "yearly") {
+          fail(item.label + "の支払周期を選択してください。"); return;
+        }
+        factor = period === "monthly" ? 12 : 1;
+      } else if (item.period === "years" || item.period === "times") {
+        const periodId = prefix + (item.period === "years" ? "Years" : "Times");
+        const period = numeric(periodId);
+        const periodRule = item.period === "years" ? numericLimits.maintenanceYears : numericLimits.maintenanceTimes;
+        const periodRangeError = checkNumericRange(periodId, periodRule, false,
+          item.label + "の" + periodRule[2]);
+        if (periodRangeError) {
+          document.getElementById("leaseMaintenanceDetails").open = true;
+          fail(periodRangeError); return;
+        }
+        if (get(periodId) === "" || !Number.isFinite(period) || period <= 0) {
+          fail(item.label + "の対象期間または年間回数を入力してください。"); return;
+        }
+        factor = item.period === "years" ? 1 / period : period;
+      }
+      annualItems[item.key] = amount * factor;
+    }
+    calculateCost();
+    if (vehicleCostRawForEstimate === null) {
+      fail("先に距離・燃料価格・燃費・ETCの入力を確認してください。"); return;
+    }
+    const annualLease = numeric("leaseMonthlyFee") * 12;
+    const annualInitial = initial * 12 / numeric("leaseMonths");
+    const annualBonus = bonus * bonusTimes;
+    const annualMaintenance = Object.values(annualItems).reduce((sum, value) => sum + value, 0);
+    const annualTotal = annualLease + annualInitial + annualBonus + annualMaintenance;
+    const perKm = annualTotal / numeric("leaseYearlyDistance");
+    const tripDistance = Number(get("distance")) * (tripForEstimate === "round" ? 2 : 1);
+    const tripVehicleCost = perKm * tripDistance;
+    const total = vehicleCostRawForEstimate + tripVehicleCost;
+    if (!finiteNumbers(...Object.values(annualItems), annualLease, annualInitial, annualBonus,
+        annualMaintenance, annualTotal, perKm, tripDistance, tripVehicleCost, total,
+        vehicleCostRawForEstimate)) {
+      fail(nonFiniteMessage);
+      return;
+    }
+    const yen = value => value.toLocaleString("ja-JP", { maximumFractionDigits: 2 }) + "円";
+    const row = (label, value) => '<div class="cost-row"><span>' + label +
+      '</span><strong>' + yen(value) + '</strong></div>';
+    document.getElementById("leaseResultTitle").textContent = "今回の実際の移動費";
+    document.getElementById("leaseTotal").textContent = Math.round(total).toLocaleString("ja-JP") + "円";
+    document.getElementById("leaseBreakdown").innerHTML =
+      '<div class="cost-row"><span>契約期間</span><strong>' + numeric("leaseMonths") + ' か月</strong></div>' +
+      '<div class="cost-row"><span>年間走行距離</span><strong>' + numeric("leaseYearlyDistance").toLocaleString("ja-JP") + ' km/年</strong></div>' +
+      row("年間リース基本料", annualLease) +
+      row("初期費用の年間換算額", annualInitial) +
+      row("ボーナス払いの年間換算額", annualBonus) +
+      leaseItems.map(item => row(item.label + "（追加年間額）", annualItems[item.key])).join("") +
+      row("追加年間維持費", annualMaintenance) +
+      row("年間車両コスト", annualTotal) +
+      row("1km当たり車両コスト", perKm).replace("円</strong>", "円/km</strong>") +
+      row("今回の車両コスト分", tripVehicleCost) +
+      row("基本移動費（燃料費・ETC）", vehicleCostRawForEstimate) +
+      '<div class="cost-row total"><span>今回の実際の移動費</span><strong>' + yen(total) + '</strong></div>' +
+      '<p class="note">金額の明細は小数第2位まで、上の合計は内部計算値を円単位に四捨五入して表示します。</p>';
+    document.getElementById("leaseResult").style.display = "block";
+  }
+
+  setupLeaseItems();
+
+  function openBusinessEstimate() {
+    calculateCost();
+    if (vehicleCostForEstimate === null) return;
+    const panel = document.getElementById("businessPanel");
+    panel.style.display = "block";
+    panel.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }
+
+  function toggleTravelLabor() {
+    const enabled = document.getElementById("addTravelLabor").checked;
+    document.getElementById("travelLaborFields").style.display = enabled ? "block" : "none";
+    document.getElementById("businessResult").style.display = "none";
+    document.getElementById("businessError").style.display = "none";
+  }
+
+  function calculateBusinessEstimate() {
+    calculateCost();
+    if (vehicleCostForEstimate === null) return;
+    const addMaintenance = document.getElementById("addMaintenance").checked;
+    const maintenanceInput = document.getElementById("maintenanceRate").value.trim();
+    const maintenanceRate = addMaintenance ? Number(maintenanceInput) : 0;
+    const addTravelLabor = document.getElementById("addTravelLabor").checked;
+    const minutesInput = document.getElementById("travelMinutes").value.trim();
+    const passengersInput = document.getElementById("passengers").value.trim();
+    const hourlyInput = document.getElementById("hourlyRate").value.trim();
+    const overheadInput = document.getElementById("overheadRate").value.trim();
+    const minutes = Number(minutesInput);
+    const passengers = Number(passengersInput);
+    const hourlyRate = Number(hourlyInput);
+    const overheadRate = overheadInput === "" ? 0 : Number(overheadInput);
+    const error = document.getElementById("businessError");
+    const result = document.getElementById("businessResult");
+
+    const businessRangeError = [
+      ["maintenanceRate", numericLimits.maintenanceRate, !addMaintenance],
+      ["travelMinutes", numericLimits.travelMinutes, !addTravelLabor],
+      ["passengers", numericLimits.passengers, !addTravelLabor],
+      ["hourlyRate", numericLimits.hourlyRate, !addTravelLabor],
+      ["overheadRate", numericLimits.overheadRate, true]
+    ].filter(([id]) => id === "overheadRate" ||
+      (id === "maintenanceRate" ? addMaintenance : addTravelLabor))
+      .map(([id, rule, optional]) => checkNumericRange(id, rule, optional)).find(Boolean);
+    if (businessRangeError) {
+      result.style.display = "none";
+      error.textContent = businessRangeError;
+      error.style.display = "block";
+      return;
+    }
+
+    if ((addMaintenance && (maintenanceInput === "" ||
+        !Number.isFinite(maintenanceRate) || maintenanceRate < 0)) ||
+        (addTravelLabor && (minutesInput === "" || !Number.isFinite(minutes) || minutes <= 0 ||
+        passengersInput === "" || !Number.isInteger(passengers) || passengers < 1 ||
+        hourlyInput === "" || !Number.isFinite(hourlyRate) || hourlyRate <= 0)) ||
+        !Number.isFinite(overheadRate) || overheadRate < 0) {
+      result.style.display = "none";
+      error.textContent = "車両維持費・片道移動時間・乗車人数・時間単価・諸経費率を確認してください。";
+      error.style.display = "block";
+      return;
+    }
+
+    const multiplier = tripForEstimate === "round" ? 2 : 1;
+    const totalMinutes = minutes * multiplier;
+    const maintenanceCost = Number(document.getElementById("distance").value) * multiplier * maintenanceRate;
+    const businessVehicleCost = Math.round(vehicleCostRawForEstimate + maintenanceCost);
+    const laborCost = addTravelLabor ? Math.round(totalMinutes / 60 * passengers * hourlyRate) : 0;
+    const baseAmount = businessVehicleCost + laborCost;
+    const overheadCost = Math.round(baseAmount * overheadRate / 100);
+    const customerAmount = baseAmount + overheadCost;
+    if (!finiteNumbers(totalMinutes, maintenanceCost, businessVehicleCost, laborCost,
+        baseAmount, overheadCost, customerAmount, vehicleCostForEstimate,
+        vehicleCostRawForEstimate)) {
+      result.style.display = "none";
+      error.textContent = nonFiniteMessage;
+      error.style.display = "block";
+      return;
+    }
+    const yen = amount => amount.toLocaleString("ja-JP", { maximumFractionDigits: 2 }) + " 円";
+
+    document.getElementById("businessTotal").textContent =
+      customerAmount.toLocaleString("ja-JP") + "円";
+    document.getElementById("businessDetail").innerHTML =
+      '<div class="cost-row"><span>車両交通費</span><strong>' + yen(vehicleCostRawForEstimate) + '</strong></div>' +
+      (addMaintenance ? '<div class="cost-row"><span>車両維持費</span><strong>' + yen(maintenanceCost) + '</strong></div>' : '') +
+      '<div class="cost-row"><span>車両コスト</span><strong>' + yen(businessVehicleCost) + '</strong></div>' +
+      (addTravelLabor ? '<div class="cost-row"><span>移動時間</span><strong>' +
+      minutes.toLocaleString("ja-JP") + ' 分（' + (multiplier === 2 ? '往復 ' : '片道 ') +
+      totalMinutes.toLocaleString("ja-JP") + ' 分）</strong></div>' +
+      '<div class="cost-row"><span>乗車人数</span><strong>' + passengers + ' 人</strong></div>' +
+      '<div class="cost-row"><span>移動人件費</span><strong>' + yen(laborCost) + '</strong></div>' : '') +
+      (overheadRate > 0 ? '<div class="cost-row"><span>諸経費（' + overheadRate +
+        '%）</span><strong>' + yen(overheadCost) + '</strong></div>' : '') +
+      '<div class="cost-row total"><span>客先請求額</span><strong>' + yen(customerAmount) + '</strong></div>' +
+      '<p class="note">車両コストは端数を含む車両交通費と維持費を合算してから円単位に四捨五入します。</p>';
+    error.style.display = "none";
+    result.style.display = "block";
+  }
+
+  ["distance", "fuelPrice", "fuelEfficiency", "etcFee"].forEach(id => {
+    const field = document.getElementById(id);
+    field.addEventListener("input", invalidateBasicResults);
+    field.addEventListener("change", invalidateBasicResults);
+  });
+  changeFuel();
 </script>
 
 </body>
