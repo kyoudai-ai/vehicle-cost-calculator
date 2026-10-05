@@ -320,7 +320,7 @@
     </p>
     <p class="note">
       経路距離は目安です。実際の道路状況や通行料金は反映されません。<br>
-      住所検索：Nominatim、経路：OSRM、地図データ：© OpenStreetMap contributors
+      住所データ：<a href="https://github.com/geolonia/japanese-addresses-v2" target="_blank" rel="noopener noreferrer">Geolonia（デジタル庁アドレス・ベース・レジストリ等を加工、CC BY 4.0）</a>／Nominatim、経路：OSRM、地図データ：© OpenStreetMap contributors
     </p>
 
     <label>片道・往復</label>
@@ -639,6 +639,9 @@
 
 </main>
 
+<script src="geolonia-3.1.3.js"></script>
+<script src="geocode.js"></script>
+<script src="location-confirm.js"></script>
 <script>
   let tripType = "round";
 
@@ -737,15 +740,10 @@
   }
 
   async function geocodeAddress(address, signal, stage) {
-    const query = /日本|Japan/i.test(address) ? address : address + ", 日本";
-    const url = "https://nominatim.openstreetmap.org/search?" +
-      new URLSearchParams({ q: query, format: "json", limit: "1", countrycodes: "jp" });
-    const results = await getJson(url, signal, stage);
-    const point = results[0];
-    if (!point || !Number.isFinite(Number(point.lon)) || !Number.isFinite(Number(point.lat))) {
-      throw new Error("住所が見つかりませんでした");
-    }
-    return [Number(point.lon), Number(point.lat)];
+    const candidate = await KyoudaiGeocoder.locate(address, signal, stage);
+    if (signal.aborted) throw new DOMException("中止", "AbortError");
+    await KyoudaiLocationConfirm.ask(candidate, signal, stage);
+    return candidate.coordinates;
   }
 
   async function lookupDrivingDistance() {
@@ -763,19 +761,20 @@
     }
 
     const requestId = ++routeRequestId;
+    distance.value = "";
+    if (timeSource === "auto") travelMinutes.value = "";
+    invalidateBasicResults();
     const previousDistance = distance.value;
     const previousTime = travelMinutes.value;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const timeout = setTimeout(() => controller.abort(), 60000);
     button.disabled = true;
     status.removeAttribute("aria-invalid");
     status.textContent = "車での走行距離を調べています…";
 
     try {
-      const origin = await geocodeAddress(start, controller.signal, "出発地の住所検索（Nominatim）");
-      // Nominatim の公開サービスは最大 1 リクエスト/秒。
-      await pause(1100);
-      const target = await geocodeAddress(destination, controller.signal, "目的地の住所検索（Nominatim）");
+      const origin = await geocodeAddress(start, controller.signal, "出発地の場所確認");
+      const target = await geocodeAddress(destination, controller.signal, "目的地の場所確認");
       const coordinates = [origin, target].map(point => point.join(",")).join(";");
       const url = "https://router.project-osrm.org/route/v1/driving/" +
         coordinates + "?overview=false";
@@ -799,7 +798,7 @@
       if (Number.isFinite(seconds) && seconds > 0 && travelMinutes.value === previousTime) {
         travelMinutes.value = String(Math.max(1, Math.round(seconds / 60)));
         timeSource = "auto";
-        status.textContent = "片道の走行距離と移動時間を反映しました。どちらも修正できます。";
+        status.textContent = "片道の走行距離：" + distance.value + "km・参考移動時間：" + travelMinutes.value + "分（OSRM）。距離と移動時間を反映しました。";
       } else {
         if (timeSource === "auto" && travelMinutes.value === previousTime) {
           travelMinutes.value = "";
@@ -808,19 +807,30 @@
         status.textContent = "片道の走行距離を反映しました。移動時間は業者向け画面で確認・手入力できます。";
       }
     } catch (error) {
+      if (requestId !== routeRequestId) return;
       if (timeSource === "auto" && travelMinutes.value === previousTime) {
         travelMinutes.value = "";
         timeSource = "manual";
       }
       status.setAttribute("aria-invalid", "true");
       status.textContent = (error.name === "AbortError"
-        ? error.stage + "が時間切れになりました。"
+        ? (error.stage || "住所・経路の取得") + "が時間切れになりました。"
         : error.message) + " 距離と移動時間を手入力して計算できます。";
     } finally {
       clearTimeout(timeout);
       if (requestId === routeRequestId) button.disabled = false;
     }
   }
+
+  ["start", "destination"].forEach(id => document.getElementById(id).addEventListener("input", () => {
+    routeRequestId++;
+    if (typeof KyoudaiLocationConfirm !== "undefined") KyoudaiLocationConfirm.cancel();
+    document.getElementById("lookupDistance").disabled = false;
+    document.getElementById("distance").value = "";
+    if (timeSource === "auto") document.getElementById("travelMinutes").value = "";
+    invalidateBasicResults();
+    document.getElementById("routeStatus").textContent = "住所が変わりました。距離を再取得してください。";
+  }));
 
   function markTimeManual() {
     timeSource = "manual";
